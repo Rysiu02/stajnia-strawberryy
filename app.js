@@ -107,16 +107,29 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function loadUserProfile(uid) {
+  /* Zawsze najpierw ustaw fallback z danych Auth */
+  currentProfile = {
+    displayName: currentUser.displayName || currentUser.email,
+    email:       currentUser.email,
+    role:        'viewer'
+  };
+  currentRole = 'viewer';
+
   try {
     const snap = await getDoc(doc(db, 'users', uid));
     if (snap.exists()) {
-      currentProfile = snap.data();
-      currentRole    = currentProfile.role || 'viewer';
+      /* Profil znaleziony — nadpisz danymi z Firestore (imię i rola właściciela) */
+      const data = snap.data();
+      currentProfile = data;
+      currentRole    = data.role || 'viewer';
+      /* Jeśli displayName w Firestore jest mailem (stary błąd) — NIE nadpisuj */
+      if (!data.displayName || data.displayName === data.email || data.displayName.includes('@')) {
+        /* displayName to email lub puste — zachowaj to co mamy, nie naprawiaj tu */
+      }
     } else {
-      /* Brak profilu w Firestore — ustaw imię z Firebase Auth lub z maila */
-      const authName = currentUser.displayName || null;
+      /* Brak profilu — utwórz z danymi Auth (nie nadpisuj jeśli właściciel już stworzył) */
       currentProfile = {
-        displayName: authName || currentUser.email.split('@')[0],
+        displayName: currentUser.displayName || currentUser.email.split('@')[0],
         email:       currentUser.email,
         role:        'viewer'
       };
@@ -124,26 +137,10 @@ async function loadUserProfile(uid) {
         ...currentProfile,
         createdAt: serverTimestamp()
       });
-      currentRole = 'viewer';
     }
   } catch(e) {
-    console.error('loadUserProfile:', e);
-    /* Nawet jeśli Firestore zawiedzie — pokaż przynajmniej imię z Firebase Auth */
-    currentProfile = {
-      displayName: currentUser.displayName || currentUser.email.split('@')[0],
-      email:       currentUser.email,
-      role:        'viewer'
-    };
-    currentRole = 'viewer';
-
-    /* Spróbuj jeszcze raz bez reguł (własny profil zawsze dostępny) */
-    try {
-      const snap2 = await getDoc(doc(db, 'users', uid));
-      if (snap2.exists()) {
-        currentProfile = snap2.data();
-        currentRole    = currentProfile.role || 'viewer';
-      }
-    } catch(e2) { /* ignoruj */ }
+    console.error('loadUserProfile error:', e);
+    /* Fallback już ustawiony powyżej */
   }
 }
 
@@ -215,8 +212,16 @@ function showApp() {
 
   const badge = document.getElementById('user-badge');
   badge.className = 'user-badge ' + (ROLES[currentRole]?.css || '');
+
+  /* Wybierz najlepsze imię do wyświetlenia */
+  const rawName   = currentProfile?.displayName || '';
+  const looksLikeEmail = rawName.includes('@') || !rawName;
+  const displayN  = looksLikeEmail
+    ? (currentUser.email.split('@')[0])  // fallback na część przed @
+    : rawName;
+
   document.getElementById('user-name-display').textContent =
-    (currentProfile?.displayName || currentUser.email) + ' · ' + (ROLES[currentRole]?.label || '');
+    displayN + ' · ' + (ROLES[currentRole]?.label || '');
   document.getElementById('sidebar-role-info').textContent =
     'Rola: ' + (ROLES[currentRole]?.label || '—');
 
@@ -224,7 +229,7 @@ function showApp() {
   document.getElementById('current-date').textContent =
     now.toLocaleDateString('pl-PL', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   document.getElementById('dashboard-greeting').textContent =
-    'Dzień dobry, ' + (currentProfile?.displayName?.split(' ')[0] || 'szeryf');
+    'Dzień dobry, ' + (looksLikeEmail ? displayN : displayN.split(' ')[0]);
   document.getElementById('current-month-label').textContent = weekLabel(currentWeek());
 
   const ym = now.toISOString().slice(0,7);
@@ -1084,7 +1089,7 @@ async function loadAccounts() {
       const u      = d.data();
       const isSelf = d.id === currentUser.uid;
       rows += `<tr>
-        <td>${u.displayName||'—'} ${isSelf?'<span class="badge badge-gray" style="font-size:0.6rem">Ty</span>':''}</td>
+        <td>${(u.displayName && !u.displayName.includes('@')) ? u.displayName : (u.email?.split('@')[0]||'—')} ${isSelf?'<span class="badge badge-gray" style="font-size:0.6rem">Ty</span>':''}</td>
         <td class="muted">${u.email||'—'}</td>
         <td>${roleBadge(u.role)}</td>
         <td>
@@ -1165,9 +1170,9 @@ window.hireEmployee = async function() {
 
     /* Krok 2 — zapisz profil w Firestore z rolą wybraną przez właściciela */
     await setDoc(doc(db, 'users', newUid), {
-      displayName: name,
+      displayName: name,   /* imię i nazwisko — ZAWSZE z formularza */
       email,
-      role,       /* rola ustawiona od razu — nie trzeba się logować */
+      role,
       createdAt:  serverTimestamp(),
       hiredBy:    currentUser.uid,
       hiredByName: currentProfile?.displayName || currentUser.email
