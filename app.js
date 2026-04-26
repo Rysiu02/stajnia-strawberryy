@@ -6,6 +6,9 @@ import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
+  getFunctions, httpsCallable
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+import {
   getFirestore,
   doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
   collection, query, orderBy, serverTimestamp
@@ -52,6 +55,7 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const auth        = getAuth(firebaseApp);
 const db          = getFirestore(firebaseApp);
+const functions   = getFunctions(firebaseApp, 'europe-west1');
 
 /* =====================================================
    STAŁE
@@ -129,6 +133,28 @@ const fmtD = ts => ts?.toDate
   : '—';
 function currentMonth() { return new Date().toISOString().slice(0,7); }
 
+/* Rozliczenia tygodniowe — zwraca string "RRRR-Wnn" np. "2025-W18" */
+function currentWeek() {
+  const now  = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const week = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  return now.getFullYear() + '-W' + String(week).padStart(2, '0');
+}
+
+/* Etykieta tygodnia np. "Tydzień 18 (28 kwi – 4 maj 2025)" */
+function weekLabel(weekStr) {
+  if (!weekStr) return '—';
+  const [year, wPart] = weekStr.split('-W');
+  const weekNum = parseInt(wPart);
+  // Pierwszy dzień tygodnia
+  const jan1   = new Date(parseInt(year), 0, 1);
+  const days   = (weekNum - 1) * 7;
+  const monday = new Date(jan1.getTime() + (days - jan1.getDay() + 1) * 86400000);
+  const sunday = new Date(monday.getTime() + 6 * 86400000);
+  const fmt2   = d => d.toLocaleDateString('pl-PL', { day:'numeric', month:'short' });
+  return `Tydzień ${weekNum} (${fmt2(monday)} – ${fmt2(sunday)} ${year})`;
+}
+
 /* =====================================================
    EKRANY
    ===================================================== */
@@ -160,7 +186,7 @@ function showApp() {
     now.toLocaleDateString('pl-PL', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   document.getElementById('dashboard-greeting').textContent =
     'Dzień dobry, ' + (currentProfile?.displayName?.split(' ')[0] || 'szeryf');
-  document.getElementById('current-month-label').textContent = currentMonth();
+  document.getElementById('current-month-label').textContent = weekLabel(currentWeek());
 
   const ym = now.toISOString().slice(0,7);
   ['receipts-filter-month','expenses-filter-month','tax-filter-month'].forEach(id => {
@@ -271,9 +297,18 @@ async function loadDashboard() {
     const workerMap = {};
     const recentRows = [];
 
+    const week = currentWeek();
     rSnap.forEach(d => {
       const r = d.data();
-      if (r.month !== month) return;
+      /* Dla nowych rachunków sprawdź pole week, dla starych wylicz z daty */
+      let rWeek = r.week;
+      if (!rWeek && r.createdAt?.toDate) {
+        const date = r.createdAt.toDate();
+        const jan1 = new Date(date.getFullYear(), 0, 1);
+        const wNum = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        rWeek = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
+      }
+      if (rWeek !== week) return; // pokaż tylko bieżący tydzień
       totalSales   += r.total      || 0;
       totalStable  += r.stable     || 0;
       totalWorkers += r.workerCut  || 0;
@@ -284,11 +319,12 @@ async function loadDashboard() {
       recentRows.push({ ...r, _id: d.id });
     });
 
-    /* Wypłacone */
+    /* Wypłacone — filtruj po bieżącym tygodniu */
     const pSnap = await getDocs(collection(db,'payouts'));
     pSnap.forEach(d => {
       const p = d.data();
-      if (p.month !== month) return;
+      const pKey = p.week || p.month;
+      if (pKey !== week) return;
       if (workerMap[p.workerUid]) workerMap[p.workerUid].paid += p.amount || 0;
     });
 
@@ -514,7 +550,7 @@ window.saveReceipt = async function() {
   try {
     await addDoc(collection(db,'receipts'), {
       lines, total, stable: half, workerCut: half,
-      client, note, month,
+      client, note, month, week,
       workerUid:  currentUser.uid,
       workerName: currentProfile?.displayName || currentUser.email,
       createdAt:  serverTimestamp()
@@ -679,7 +715,7 @@ window.deleteExpense = async function(id) {
 };
 
 /* =====================================================
-   WYPŁATY
+   WYPŁATY — rozliczenia TYGODNIOWE
    ===================================================== */
 async function loadPayroll() {
   const el = document.getElementById('payroll-content');
@@ -694,57 +730,103 @@ async function loadPayroll() {
     const rSnap = await getDocs(collection(db,'receipts'));
     const pSnap = await getDocs(collection(db,'payouts'));
 
-    const monthMap = {};
+    /* Grupuj rachunki po tygodniach */
+    const weekMap = {}; // { "2025-W18": { uid: { name, workerCut, paid } } }
+
     rSnap.forEach(d => {
       const r = d.data();
-      const m = r.month || '—';
-      if (!monthMap[m]) monthMap[m] = {};
-      if (!monthMap[m][r.workerUid]) monthMap[m][r.workerUid] = { name: r.workerName||'—', workerCut:0, paid:0 };
-      monthMap[m][r.workerUid].workerCut += r.workerCut || 0;
-    });
-    pSnap.forEach(d => {
-      const p = d.data();
-      if (monthMap[p.month]?.[p.workerUid]) monthMap[p.month][p.workerUid].paid += p.amount || 0;
+      /* Użyj pola week jeśli istnieje, wpp wylicz z daty lub użyj miesiąca jako fallback */
+      let key;
+      if (r.week) {
+        key = r.week;
+      } else if (r.createdAt?.toDate) {
+        // Wylicz tydzień z daty zapisu
+        const date  = r.createdAt.toDate();
+        const jan1  = new Date(date.getFullYear(), 0, 1);
+        const wNum  = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        key = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
+      } else {
+        key = r.month || '—';
+      }
+
+      if (!weekMap[key]) weekMap[key] = {};
+      if (!weekMap[key][r.workerUid]) weekMap[key][r.workerUid] = { name: r.workerName||'—', workerCut:0, paid:0 };
+      weekMap[key][r.workerUid].workerCut += r.workerCut || 0;
     });
 
-    const months = Object.keys(monthMap).sort().reverse();
-    if (!months.length) {
+    /* Dodaj wypłacone kwoty */
+    pSnap.forEach(d => {
+      const p   = d.data();
+      const key = p.week || p.month || '—';
+      if (weekMap[key]?.[p.workerUid]) {
+        weekMap[key][p.workerUid].paid += p.amount || 0;
+      }
+    });
+
+    const weeks = Object.keys(weekMap).sort().reverse();
+    if (!weeks.length) {
       el.innerHTML = '<p style="font-family:var(--font-type);color:var(--dust);padding:1rem">Brak danych</p>';
       return;
     }
-    el.innerHTML = months.map(m => `
-      <div class="panel">
-        <div class="panel-header"><div class="panel-title">💰 Wypłaty — ${m}</div></div>
-        <div class="panel-body" style="padding:0">
-          <table class="western-table">
-            <thead><tr><th>Pracownik</th><th>Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th><th>Akcja</th></tr></thead>
-            <tbody>
-              ${Object.entries(monthMap[m]).map(([uid,w]) => {
-                const rem = Math.max(0, w.workerCut - w.paid);
-                return `<tr>
-                  <td>${w.name}</td>
-                  <td style="color:#6abf7e">${fmt(w.workerCut)}</td>
-                  <td class="muted">${fmt(w.paid)}</td>
-                  <td><strong style="color:var(--pale-gold)">${fmt(rem)}</strong></td>
-                  <td>${rem > 0
-                    ? `<button class="btn btn-primary" style="padding:0.25rem 0.6rem;font-size:0.65rem"
-                        onclick="payWorker('${uid}','${w.name}','${m}',${rem})">Wypłać ${fmt(rem)}</button>`
-                    : '<span class="badge badge-green">Wypłacono</span>'}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`).join('');
+
+    el.innerHTML = weeks.map(wk => {
+      const label    = weekLabel(wk);
+      const workers  = Object.entries(weekMap[wk]);
+      const totalWk  = workers.reduce((s,[,w]) => s + w.workerCut, 0);
+      const totalPaid= workers.reduce((s,[,w]) => s + w.paid, 0);
+      const totalRem = Math.max(0, totalWk - totalPaid);
+
+      return `
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">💰 ${label}</div>
+            <span style="font-family:var(--font-type);font-size:0.7rem;color:var(--dust)">
+              Do wypłaty: <strong style="color:var(--pale-gold)">${fmt(totalRem)}</strong>
+            </span>
+          </div>
+          <div class="panel-body" style="padding:0">
+            <table class="western-table">
+              <thead>
+                <tr><th>Pracownik</th><th>Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th><th>Akcja</th></tr>
+              </thead>
+              <tbody>
+                ${workers.map(([uid,w]) => {
+                  const rem = Math.max(0, w.workerCut - w.paid);
+                  return `<tr>
+                    <td>${w.name}</td>
+                    <td style="color:#6abf7e">${fmt(w.workerCut)}</td>
+                    <td class="muted">${fmt(w.paid)}</td>
+                    <td><strong style="color:var(--pale-gold)">${fmt(rem)}</strong></td>
+                    <td>${rem > 0
+                      ? `<button class="btn btn-primary" style="padding:0.25rem 0.6rem;font-size:0.65rem"
+                          onclick="payWorker('${uid}','${w.name}','${wk}',${rem})">
+                          Wypłać ${fmt(rem)}
+                         </button>`
+                      : '<span class="badge badge-green">Wypłacono</span>'}
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }).join('');
+
   } catch(e) { console.error('Payroll:', e); el.innerHTML = '❌ Błąd ładowania'; }
 }
 
-window.payWorker = async function(uid, name, month, amount) {
-  if (!await showConfirm(`Wypłacić ${fmt(amount)} dla ${name} za ${month}?`, 'Wypłać', false)) return;
+window.payWorker = async function(uid, name, weekKey, amount) {
+  const label = weekLabel(weekKey);
+  if (!await showConfirm(`Wypłacić ${fmt(amount)} dla ${name}?\n${label}`, 'Wypłać', false)) return;
   try {
     await addDoc(collection(db,'payouts'), {
-      workerUid: uid, workerName: name, month, amount,
-      paidBy: currentUser.uid, createdAt: serverTimestamp()
+      workerUid:  uid,
+      workerName: name,
+      week:       weekKey,
+      month:      weekKey.includes('-W') ? weekKey.slice(0,4) + '-' + String(new Date().getMonth()+1).padStart(2,'0') : weekKey,
+      amount,
+      paidBy:    currentUser.uid,
+      createdAt: serverTimestamp()
     });
     showToast(`✓ Wypłacono ${fmt(amount)} dla ${name}`);
     loadPayroll(); loadDashboard();
@@ -1052,39 +1134,38 @@ window.togglePassVisibility = function() {
 };
 
 window.fireEmployee = async function(uid, name) {
-  if (!await showConfirm(`Zwolnić ${name} z pracy?\nKonto zostanie dezaktywowane.`, 'Zwolnij')) return;
+  if (!await showConfirm(
+    `Usunąć konto ${name}?\nUżytkownik straci dostęp i nie będzie mógł się zalogować.`,
+    'Usuń konto'
+  )) return;
+
+  showToast('⏳ Usuwanie konta...');
+
   try {
-    // Oznacz w Firestore jako zwolniony + zablokuj dostęp przez zmianę roli
-    await updateDoc(doc(db,'users',uid), {
-      role:     'viewer',
-      fired:    true,
-      active:   false,
-      firedAt:  serverTimestamp(),
-      firedBy:  currentUser.uid
-    });
-
-    // Wyślij żądanie wyłączenia konta przez Firebase Auth REST API
-    const apiKey = 'AIzaSyC-ONjc-zKqbq6_ojQyTu7rPWm7iK5aZro';
-    await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
-      {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          idToken:  (await auth.currentUser.getIdToken()),
-          localId:  uid,
-          disableUser: true
-        })
-      }
-    );
-
-    showToast('✓ ' + name + ' został zwolniony i zablokowany');
+    /* Wywołaj Cloud Function — usuwa z Auth + Firestore */
+    const deleteUser = httpsCallable(functions, 'deleteUser');
+    await deleteUser({ uid });
+    showToast('✓ Konto ' + name + ' zostało usunięte');
     loadAccounts();
   } catch(e) {
-    // Nawet jeśli REST API zawiedzie, Firestore jest już zaktualizowany
-    showToast('✓ ' + name + ' zwolniony (rola zmieniona na Obserwator)');
-    loadAccounts();
-    console.warn('fireEmployee REST:', e);
+    if (e.code === 'functions/not-found' || e.message?.includes('not-found')) {
+      /* Cloud Function nie jest jeszcze wdrożona — fallback: oznacz w Firestore */
+      showToast('⚠ Cloud Function nie wdrożona — blokuję dostęp w bazie...');
+      try {
+        await updateDoc(doc(db,'users',uid), {
+          role:    'viewer',
+          fired:   true,
+          active:  false,
+          firedAt: serverTimestamp(),
+          firedBy: currentUser.uid
+        });
+        showToast('✓ ' + name + ' zablokowany (rola: Obserwator). Wdróż Cloud Function żeby usuwać konta całkowicie.');
+        loadAccounts();
+      } catch(e2) { showToast('❌ ' + e2.message); }
+    } else {
+      showToast('❌ Błąd: ' + (e.message || e.code));
+      console.error('fireEmployee:', e);
+    }
   }
 };
 
