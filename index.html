@@ -441,10 +441,13 @@
 
       <div class="panel">
         <div class="panel-header">
-          <div class="panel-title">📑 Miesięczne Zestawienie</div>
-          <input class="form-input" id="tax-filter-month" type="month"
-            style="padding:0.3rem 0.6rem;font-size:0.75rem;width:160px"
-            onchange="loadTax()"/>
+          <div class="panel-title">📑 Tygodniowe Zestawienie</div>
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+            <span id="tax-week-label" style="font-family:var(--font-type);font-size:0.7rem;color:var(--dust)">—</span>
+            <input class="form-input" id="tax-filter-week" type="week"
+              style="padding:0.3rem 0.6rem;font-size:0.75rem;width:180px"
+              onchange="loadTax()"/>
+          </div>
         </div>
         <div class="panel-body">
           <div class="cards-grid" id="tax-cards" style="margin-bottom:1.5rem">

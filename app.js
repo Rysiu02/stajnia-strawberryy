@@ -189,10 +189,12 @@ function showApp() {
   document.getElementById('current-month-label').textContent = weekLabel(currentWeek());
 
   const ym = now.toISOString().slice(0,7);
-  ['receipts-filter-month','expenses-filter-month','tax-filter-month'].forEach(id => {
+  ['receipts-filter-month','expenses-filter-month'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = ym;
   });
+  const tw = document.getElementById('tax-filter-week');
+  if (tw) tw.value = currentWeek();
 
   applyRoleRestrictions();
   loadAll();
@@ -834,23 +836,50 @@ window.payWorker = async function(uid, name, weekKey, amount) {
 };
 
 /* =====================================================
-   PODATEK
+   PODATEK — rozliczenia TYGODNIOWE
    ===================================================== */
 window.loadTax = async function() {
-  const month = document.getElementById('tax-filter-month')?.value || currentMonth();
+  const selWeek = document.getElementById('tax-filter-week')?.value || currentWeek();
+
+  /* Pokaż etykietę wybranego tygodnia */
+  const lbl = document.getElementById('tax-week-label');
+  if (lbl) lbl.textContent = weekLabel(selWeek);
+
   try {
+    /* Przychód — suma rachunków z wybranego tygodnia */
     const rSnap = await getDocs(collection(db,'receipts'));
     let income = 0;
-    rSnap.forEach(d => { const r=d.data(); if(r.month===month) income += r.total||0; });
+    rSnap.forEach(d => {
+      const r = d.data();
+      let rWeek = r.week;
+      if (!rWeek && r.createdAt?.toDate) {
+        const date = r.createdAt.toDate();
+        const jan1 = new Date(date.getFullYear(), 0, 1);
+        const wNum = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        rWeek = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
+      }
+      if (rWeek === selWeek) income += r.total || 0;
+    });
 
+    /* Wydatki z wybranego tygodnia */
     const eSnap = await getDocs(collection(db,'expenses'));
     let expenses = 0;
-    eSnap.forEach(d => { const e=d.data(); if(e.month===month) expenses += e.amount||0; });
+    eSnap.forEach(d => {
+      const e = d.data();
+      let eWeek = e.week;
+      if (!eWeek && e.createdAt?.toDate) {
+        const date = e.createdAt.toDate();
+        const jan1 = new Date(date.getFullYear(), 0, 1);
+        const wNum = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        eWeek = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
+      }
+      if (eWeek === selWeek) expenses += e.amount || 0;
+    });
 
     const net      = income - expenses;
     const rateSnap = await getDoc(doc(db,'settings','tax'));
-    const rate     = rateSnap.exists() ? (rateSnap.data().rate||0) : 0;
-    const taxAmt   = net * (rate/100);
+    const rate     = rateSnap.exists() ? (rateSnap.data().rate || 0) : 0;
+    const taxAmt   = net * (rate / 100);
 
     document.getElementById('tax-income').textContent       = fmt(income);
     document.getElementById('tax-exp').textContent          = fmt(expenses);
