@@ -75,7 +75,7 @@ const CATALOG = [
   /* === PRODUKTY === */
   { id:'szczotka',    name:'Szczotka',                  cat:'Produkty', icon:'🪮',                  img:'img/szczotka.png',        price:7,    unit:'szt.' },
   { id:'kopystka',    name:'Kopystka',                  cat:'Produkty', icon:'🔧',                  img:'img/kopystka.png',        price:17,   unit:'szt.' },
-  { id:'ozwiezwiacz', name:'Oźwieżwiacz dla konia',     cat:'Produkty', icon:'💊',                  img:'img/ozwiezwiacz.png',     price:31,   unit:'szt.' },
+  { id:'ozwiezwiacz', name:'Oźwieżwiacz dla konia',     cat:'Produkty', icon:'💊',                  img:'img/otrzeźwiacz.png',     price:31,   unit:'szt.' },
   { id:'masc',        name:'Maść dla konia',            cat:'Produkty', icon:'🧴',                  img:'img/masc.png',            price:21,   unit:'szt.' },
   { id:'siano',       name:'Siano',                     cat:'Produkty', icon:'🌾',                  img:'img/siano.png',           price:2,    unit:'kg'   },
   { id:'marchewka',   name:'Marchewka',                 cat:'Produkty', icon:'🥕',                  img:'img/marchew.png',         price:2,    unit:'szt.' },
