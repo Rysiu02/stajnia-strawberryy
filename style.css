@@ -1150,3 +1150,27 @@ main {
 #loading-overlay:not(.hidden) ~ #site-footer {
   display: none;
 }
+
+/* =====================================================
+   KAFELKI — obrazki produktów
+   ===================================================== */
+.catalog-tile-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7));
+  transition: transform 0.2s ease;
+}
+.catalog-tile:hover:not(.catalog-tile-blocked) .catalog-tile-img {
+  transform: scale(1.08);
+}
+.catalog-tile-emoji {
+  font-size: 2.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+/* Większy kafelek gdy jest obrazek */
+.catalog-tile:has(.catalog-tile-img) {
+  padding: 0.75rem 0.5rem 0.75rem;
+}

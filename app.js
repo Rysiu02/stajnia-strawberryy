@@ -71,15 +71,15 @@ const ROLE_LEVEL = { viewer: 0, worker: 1, deputy: 2, owner: 2 };
 /* Pozycje cennika — używane i w rachunkach i w magazynie */
 const CATALOG = [
   /* === USŁUGI === */
-  { id:'trening',     name:'Trening',                cat:'Usługi',   icon:'🐴', price:15,   unit:'szt.' },
+  { id:'trening',     name:'Trening',                  cat:'Usługi',   icon:'🐴',                  img:null,                      price:15,   unit:'szt.' },
   /* === PRODUKTY === */
-  { id:'szczotka',    name:'Szczotka',               cat:'Produkty', icon:'🪮', price:7,    unit:'szt.' },
-  { id:'kopystka',    name:'Kopystka',               cat:'Produkty', icon:'🔧', price:17,   unit:'szt.' },
-  { id:'ozwiezwiacz', name:'Oźwieżwiacz dla konia',  cat:'Produkty', icon:'💊', price:31,   unit:'szt.' },
-  { id:'masc',        name:'Maść dla konia',         cat:'Produkty', icon:'🧴', price:21,   unit:'szt.' },
-  { id:'siano',       name:'Siano',                  cat:'Produkty', icon:'🌾', price:2,    unit:'szt.'   },
-  { id:'marchewka',   name:'Marchewka',              cat:'Produkty', icon:'🥕', price:2,    unit:'szt.' },
-  { id:'cukier',      name:'Cukier',                 cat:'Produkty', icon:'🧊', price:1.5,  unit:'szt.'   },
+  { id:'szczotka',    name:'Szczotka',                  cat:'Produkty', icon:'🪮',                  img:'img/szczotka.png',        price:7,    unit:'szt.' },
+  { id:'kopystka',    name:'Kopystka',                  cat:'Produkty', icon:'🔧',                  img:'img/kopystka.png',        price:17,   unit:'szt.' },
+  { id:'ozwiezwiacz', name:'Oźwieżwiacz dla konia',     cat:'Produkty', icon:'💊',                  img:'img/ozwiezwiacz.png',     price:31,   unit:'szt.' },
+  { id:'masc',        name:'Maść dla konia',            cat:'Produkty', icon:'🧴',                  img:'img/masc.png',            price:21,   unit:'szt.' },
+  { id:'siano',       name:'Siano',                     cat:'Produkty', icon:'🌾',                  img:'img/siano.png',           price:2,    unit:'kg'   },
+  { id:'marchewka',   name:'Marchewka',                 cat:'Produkty', icon:'🥕',                  img:'img/marchew.png',         price:2,    unit:'szt.' },
+  { id:'cukier',      name:'Cukier',                    cat:'Produkty', icon:'🍬',                  img:'img/cukier.png',          price:1.5,  unit:'kg'   },
 ];
 
 /* =====================================================
@@ -434,16 +434,22 @@ function renderTiles(containerId, items) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = items.map(item => {
-    const whItem  = warehouseCache.find(w => w.name.toLowerCase() === item.name.toLowerCase());
-    const hasStock = !whItem || (whItem.qty ?? 0) > 0; // usługi bez magazynu = zawsze OK
+    const whItem   = warehouseCache.find(w => w.name.toLowerCase() === item.name.toLowerCase());
+    const hasStock = !whItem || (whItem.qty ?? 0) > 0;
     const isProduct = item.cat === 'Produkty';
-    const qty = whItem ? (whItem.qty ?? 0) : null;
-    const blocked = isProduct && whItem && !hasStock;
+    const qty      = whItem ? (whItem.qty ?? 0) : null;
+    const blocked  = isProduct && whItem && !hasStock;
+
+    /* Ikona — obrazek jeśli dostępny, fallback na emoji */
+    const iconHtml = item.img
+      ? `<img src="${item.img}" class="catalog-tile-img" alt="${item.name}" onerror="this.style.display='none';this.nextSibling.style.display='block'"/><span class="catalog-tile-emoji" style="display:none">${item.icon}</span>`
+      : `<span class="catalog-tile-emoji">${item.icon}</span>`;
+
     return `
       <div class="catalog-tile ${blocked ? 'catalog-tile-blocked' : ''}"
         onclick="${blocked ? '' : `addToBasket('${item.id}')`}"
         title="${blocked ? 'Brak w magazynie' : item.name + ' — ' + item.price + '$'}">
-        <div class="catalog-tile-icon">${item.icon}</div>
+        <div class="catalog-tile-icon">${iconHtml}</div>
         <div class="catalog-tile-name">${item.name}</div>
         <div class="catalog-tile-price">${item.price.toLocaleString('pl-PL', {minimumFractionDigits: item.price % 1 ? 2 : 0})} $</div>
         ${isProduct && whItem ? `<div class="catalog-tile-stock ${!hasStock ? 'out' : qty <= (whItem.threshold??5) ? 'low' : ''}">
