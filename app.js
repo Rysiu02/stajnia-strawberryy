@@ -133,26 +133,41 @@ const fmtD = ts => ts?.toDate
   : '—';
 function currentMonth() { return new Date().toISOString().slice(0,7); }
 
-/* Rozliczenia tygodniowe — zwraca string "RRRR-Wnn" np. "2025-W18" */
+/* Rozliczenia tygodniowe — zwraca string "RRRR-Wnn" np. "2025-W18" (ISO 8601) */
 function currentWeek() {
-  const now  = new Date();
-  const jan1 = new Date(now.getFullYear(), 0, 1);
-  const week = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  const now     = new Date();
+  const jan4    = new Date(now.getFullYear(), 0, 4);
+  const monday1 = new Date(jan4);
+  monday1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const diff    = now - monday1;
+  const week    = Math.floor(diff / (7 * 86400000)) + 1;
+  // Jeśli tydzień wychodzi poza rok — bierz z następnego roku
+  if (week < 1) {
+    const jan4prev = new Date(now.getFullYear() - 1, 0, 4);
+    const mon1prev = new Date(jan4prev);
+    mon1prev.setDate(jan4prev.getDate() - ((jan4prev.getDay() + 6) % 7));
+    const w = Math.floor((now - mon1prev) / (7 * 86400000)) + 1;
+    return (now.getFullYear() - 1) + '-W' + String(w).padStart(2, '0');
+  }
   return now.getFullYear() + '-W' + String(week).padStart(2, '0');
 }
 
 /* Etykieta tygodnia np. "Tydzień 18 (28 kwi – 4 maj 2025)" */
 function weekLabel(weekStr) {
   if (!weekStr) return '—';
-  const [year, wPart] = weekStr.split('-W');
-  const weekNum = parseInt(wPart);
-  // Pierwszy dzień tygodnia
-  const jan1   = new Date(parseInt(year), 0, 1);
-  const days   = (weekNum - 1) * 7;
-  const monday = new Date(jan1.getTime() + (days - jan1.getDay() + 1) * 86400000);
-  const sunday = new Date(monday.getTime() + 6 * 86400000);
-  const fmt2   = d => d.toLocaleDateString('pl-PL', { day:'numeric', month:'short' });
-  return `Tydzień ${weekNum} (${fmt2(monday)} – ${fmt2(sunday)} ${year})`;
+  // Obsłuż format "2025-W18" i "2025-W18" z przeglądarki
+  const match = String(weekStr).match(/(\d{4})-W(\d{1,2})/);
+  if (!match) return weekStr;
+  const year    = parseInt(match[1]);
+  const weekNum = parseInt(match[2]);
+  // ISO 8601 — pierwszy czwartek roku wyznacza tydzień 1
+  const jan4    = new Date(year, 0, 4);
+  const monday  = new Date(jan4);
+  monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + (weekNum - 1) * 7);
+  const sunday  = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmtDay  = d => d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
+  return `Tydzień ${weekNum} (${fmtDay(monday)} – ${fmtDay(sunday)} ${year})`;
 }
 
 /* =====================================================
