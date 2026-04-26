@@ -79,7 +79,7 @@ const CATALOG = [
   { id:'masc',        name:'Maść dla konia',         cat:'Produkty', icon:'🧴', price:21,   unit:'szt.' },
   { id:'siano',       name:'Siano',                  cat:'Produkty', icon:'🌾', price:2,    unit:'kg'   },
   { id:'marchewka',   name:'Marchewka',              cat:'Produkty', icon:'🥕', price:2,    unit:'szt.' },
-  { id:'cukier',      name:'Cukier',                 cat:'Produkty', icon:'🍬', price:1.5,  unit:'kg'   },
+  { id:'cukier',      name:'Cukier',                 cat:'Produkty', icon:'🧊', price:1.5,  unit:'kg'   },
 ];
 
 /* =====================================================
