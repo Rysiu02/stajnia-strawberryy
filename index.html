@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stajnia Strawberry — Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<!-- LOADING -->
+<div id="loading-overlay">
+  <div class="loading-seal">🐎</div>
+  <div class="loading-text">Siodłamy konie...</div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen" class="hidden">
+  <div class="login-box">
+    <div class="login-seal">🤠</div>
+    <div class="login-title">Stajnia Strawberry</div>
+    <div class="login-sub">System Zarządzania · A.D. 1899</div>
+    <div class="login-divider">✦ zaloguj się ✦</div>
+    <div id="login-form">
+      <input class="login-input" type="email"    id="login-email" placeholder="Adres e-mail..." autocomplete="email"/>
+      <input class="login-input" type="password" id="login-pass"  placeholder="Hasło dostępu..." autocomplete="current-password"/>
+      <div id="login-error" class="login-error" style="display:none"></div>
+      <button class="login-submit" id="login-btn" onclick="doLogin()">Wejdź do Stajni</button>
+    </div>
+    <div class="login-footer">Nie masz konta? Skontaktuj się z właścicielem.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-brand">
+      <div class="brand-icon">🐎</div>
+      <div class="brand-text">
+        <div class="brand-name">Stajnia Strawberry</div>
+        <div class="brand-tagline">Zarządzanie · Rachunki · Rozliczenia</div>
+      </div>
+    </div>
+    <div class="header-ornament">— ✦ —</div>
+    <div class="header-right">
+      <div class="user-badge" id="user-badge">
+        <div class="user-role-dot"></div>
+        <span id="user-name-display">—</span>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">Opuść stajnię</button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <nav id="sidebar">
+    <div class="nav-section-label">Przegląd</div>
+    <div class="nav-item active" onclick="goTo('dashboard',this)">
+      <span class="nav-icon">📋</span> Tablica
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Sprzedaż</div>
+
+    <div class="nav-item" onclick="goTo('receipts',this)">
+      <span class="nav-icon">🧾</span> Rachunki
+    </div>
+    <div class="nav-item" onclick="goTo('pricelist',this)">
+      <span class="nav-icon">💲</span> Cennik
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Finanse</div>
+
+    <div class="nav-item" onclick="goTo('payroll',this)" data-min-role="owner">
+      <span class="nav-icon">💰</span> Wypłaty
+    </div>
+    <div class="nav-item" onclick="goTo('expenses',this)">
+      <span class="nav-icon">📤</span> Wydatki
+    </div>
+    <div class="nav-item" onclick="goTo('tax',this)">
+      <span class="nav-icon">📑</span> Podatek
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Magazyn</div>
+
+    <div class="nav-item" onclick="goTo('warehouse',this)" data-min-role="worker">
+      <span class="nav-icon">🏚️</span> Magazyn
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Tablica ogłoszeń</div>
+
+    <div class="nav-item" onclick="goTo('notes',this)" data-min-role="worker">
+      <span class="nav-icon">📌</span> Notatki
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Admin</div>
+
+    <div class="nav-item" onclick="goTo('accounts',this)" data-min-role="owner">
+      <span class="nav-icon">🔑</span> Konta
+    </div>
+
+    <div class="nav-wanted">
+      <div class="nav-wanted-title">⚠ Rola</div>
+      <div class="nav-wanted-text" id="sidebar-role-info">—</div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- ===== DASHBOARD ===== -->
+    <section class="page-section active" id="section-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Tablica Główna</div>
+          <div class="page-subtitle" id="dashboard-greeting">Dzień dobry, szeryf</div>
+        </div>
+        <div class="page-date" id="current-date"></div>
+      </div>
+
+      <div class="cards-grid">
+        <div class="stat-card">
+          <div class="stat-card-icon">🧾</div>
+          <div class="stat-card-label">Sprzedaż dziś</div>
+          <div class="stat-card-value" id="stat-today">—</div>
+          <div class="stat-card-change">łączna kwota rachunków</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">🏦</div>
+          <div class="stat-card-label">Zakładka stajni</div>
+          <div class="stat-card-value" id="stat-stable">—</div>
+          <div class="stat-card-change pos">50% ze sprzedaży</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">👷</div>
+          <div class="stat-card-label">Zakładka pracowników</div>
+          <div class="stat-card-value" id="stat-workers-tab">—</div>
+          <div class="stat-card-change pos">50% ze sprzedaży</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">📤</div>
+          <div class="stat-card-label">Wydatki (miesiąc)</div>
+          <div class="stat-card-value" id="stat-expenses">—</div>
+          <div class="stat-card-change neg">zatwierdzone przez właściciela</div>
+        </div>
+      </div>
+
+      <!-- Zakładki pracowników -->
+      <div class="panel" id="workers-tabs-panel">
+        <div class="panel-header">
+          <div class="panel-title">💼 Zakładki Pracowników — bieżący miesiąc</div>
+          <span style="font-family:var(--font-type);font-size:0.7rem;color:var(--dust)" id="current-month-label"></span>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <table class="western-table">
+            <thead>
+              <tr><th>Pracownik</th><th>Sprzedaż</th><th>Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th></tr>
+            </thead>
+            <tbody id="workers-tabs-body">
+              <tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Ostatnie rachunki -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🧾 Ostatnie Rachunki</div>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <table class="western-table">
+            <thead>
+              <tr><th>Data</th><th>Pracownik</th><th>Pozycje</th><th>Kwota</th><th>Stajnia</th><th>Pracownik</th></tr>
+            </thead>
+            <tbody id="dashboard-receipts">
+              <tr><td colspan="6" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== RACHUNKI ===== -->
+    <section class="page-section" id="section-receipts">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Rachunki</div>
+          <div class="page-subtitle">Sprzedaż usług i produktów</div>
+        </div>
+      </div>
+
+      <!-- Nowy rachunek -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">+ Nowy Rachunek</div>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid form-grid-2" style="margin-bottom:1.5rem">
+            <div class="form-group">
+              <label>Klient (opcjonalnie)</label>
+              <input class="form-input" id="rec-client" type="text" placeholder="Imię klienta..."/>
+            </div>
+            <div class="form-group">
+              <label>Uwagi</label>
+              <input class="form-input" id="rec-note" type="text" placeholder="Opcjonalne..."/>
+            </div>
+          </div>
+
+          <!-- KAFELKI — Usługi -->
+          <div class="catalog-section-label">🐴 Usługi</div>
+          <div class="catalog-tiles" id="tiles-uslugi"></div>
+
+          <!-- KAFELKI — Produkty -->
+          <div class="catalog-section-label" style="margin-top:1.25rem">🛒 Produkty</div>
+          <div class="catalog-tiles" id="tiles-produkty"></div>
+
+          <!-- KAFELKI — Konie -->
+          <div class="catalog-section-label" style="margin-top:1.25rem">🐎 Sprzedaż koni</div>
+          <div class="catalog-tiles" id="tiles-konie"></div>
+
+          <!-- Koszyk — wybrane pozycje -->
+          <div style="margin-top:1.5rem">
+            <div class="catalog-section-label">🧾 Koszyk</div>
+            <div id="receipt-basket" style="margin-top:0.5rem">
+              <div style="font-family:var(--font-type);color:var(--dust);font-size:0.8rem;padding:0.5rem 0">
+                Kliknij kafelek żeby dodać pozycję...
+              </div>
+            </div>
+          </div>
+
+          <!-- Podsumowanie -->
+          <div class="receipt-summary" style="margin-top:1rem">
+            <div class="receipt-summary-row">
+              <span>Suma rachunku:</span>
+              <strong id="rec-total">0,00 $</strong>
+            </div>
+            <div class="receipt-summary-row">
+              <span>Zakładka stajni (50%):</span>
+              <span id="rec-stable-cut" style="color:var(--amber)">0,00 $</span>
+            </div>
+            <div class="receipt-summary-row">
+              <span>Zakładka pracownika (50%):</span>
+              <span id="rec-worker-cut" style="color:#6abf7e">0,00 $</span>
+            </div>
+          </div>
+
+          <div style="margin-top:1rem;display:flex;gap:0.75rem">
+            <button class="btn btn-primary" onclick="saveReceipt()">💾 Zapisz rachunek</button>
+            <button class="btn btn-ghost"   onclick="clearReceipt()">Wyczyść koszyk</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historia rachunków -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📋 Historia Rachunków</div>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input class="form-input" id="receipts-filter-month" type="month"
+              style="padding:0.3rem 0.6rem;font-size:0.75rem;width:160px"
+              onchange="loadReceiptsHistory()"/>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <table class="western-table">
+            <thead>
+              <tr><th>Data</th><th>Klient</th><th>Pracownik</th><th>Pozycje</th><th>Kwota</th><th>Stajnia</th><th>Pracownik</th><th></th></tr>
+            </thead>
+            <tbody id="receipts-history-body">
+              <tr><td colspan="8" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CENNIK ===== -->
+    <section class="page-section" id="section-pricelist">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Cennik</div>
+          <div class="page-subtitle">Usługi · Produkty · Sprzedaż koni</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">🐴 Usługi</div></div>
+          <div class="panel-body" style="padding:0">
+            <table class="western-table">
+              <thead><tr><th>Usługa</th><th>Cena</th></tr></thead>
+              <tbody>
+                <tr><td>Trening</td><td><strong style="color:var(--pale-gold)">15 $</strong></td></tr>
+                <tr><td>Szczotka</td><td><strong style="color:var(--pale-gold)">7 $</strong></td></tr>
+                <tr><td>Kopystka</td><td><strong style="color:var(--pale-gold)">17 $</strong></td></tr>
+                <tr><td>Oźwieżwiacz dla konia</td><td><strong style="color:var(--pale-gold)">31 $</strong></td></tr>
+                <tr><td>Maść dla konia</td><td><strong style="color:var(--pale-gold)">21 $</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">🌾 Produkty</div></div>
+          <div class="panel-body" style="padding:0">
+            <table class="western-table">
+              <thead><tr><th>Produkt</th><th>Cena</th></tr></thead>
+              <tbody>
+                <tr><td>Siano</td><td><strong style="color:var(--pale-gold)">2 $</strong></td></tr>
+                <tr><td>Marchewka</td><td><strong style="color:var(--pale-gold)">2 $</strong></td></tr>
+                <tr><td>Cukier</td><td><strong style="color:var(--pale-gold)">1,5 $</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" style="grid-column:1/-1">
+          <div class="panel-header"><div class="panel-title">🐎 Sprzedaż Koni — Prowizja</div></div>
+          <div class="panel-body" style="padding:0">
+            <table class="western-table">
+              <thead><tr><th>Przedział cenowy konia</th><th>Prowizja na rachunek</th><th>Podział</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>Poniżej 300 $</td>
+                  <td><strong style="color:var(--pale-gold)">+ 25 $</strong></td>
+                  <td class="muted">12,50 $ stajnia / 12,50 $ pracownik</td>
+                </tr>
+                <tr>
+                  <td>400 $ — 700 $</td>
+                  <td><strong style="color:var(--pale-gold)">+ 30 $</strong></td>
+                  <td class="muted">15 $ stajnia / 15 $ pracownik</td>
+                </tr>
+                <tr>
+                  <td>Powyżej 700 $</td>
+                  <td><strong style="color:var(--pale-gold)">+ 40 $</strong></td>
+                  <td class="muted">20 $ stajnia / 20 $ pracownik</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-body" style="border-top:1px solid rgba(196,122,43,0.15)">
+            <p style="font-family:var(--font-type);font-size:0.8rem;color:var(--dust);line-height:1.6">
+              ⚖ Każdy rachunek dzielony jest <strong style="color:var(--amber)">50% / 50%</strong> — 
+              połowa trafia na zakładkę stajni, połowa na zakładkę pracownika który wystawił rachunek.
+              Wypłata pracownika = suma jego zakładek za dany okres.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== WYPŁATY ===== -->
+    <section class="page-section" id="section-payroll">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Wypłaty</div>
+          <div class="page-subtitle">Zakładki pracowników · Rozliczenia miesięczne</div>
+        </div>
+      </div>
+      <div id="payroll-content">
+        <div style="font-family:var(--font-type);color:var(--dust);padding:1rem">Ładowanie...</div>
+      </div>
+    </section>
+
+    <!-- ===== WYDATKI ===== -->
+    <section class="page-section" id="section-expenses">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Wydatki</div>
+          <div class="page-subtitle">Na co wyciągnięto pieniądze ze stajni</div>
+        </div>
+      </div>
+
+      <!-- Dodaj wydatek — tylko właściciel -->
+      <div class="panel" id="add-expense-panel" style="display:none">
+        <div class="panel-header"><div class="panel-title">+ Dodaj Wydatek</div></div>
+        <div class="panel-body">
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label>Kto wyciągnął</label>
+              <select class="form-select" id="exp-who"></select>
+            </div>
+            <div class="form-group">
+              <label>Kwota ($)</label>
+              <input class="form-input" id="exp-amount" type="number" min="0" step="0.5" placeholder="0"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Na co przeznaczono</label>
+              <input class="form-input" id="exp-desc" type="text" placeholder="Opis wydatku..."/>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem">
+            <button class="btn btn-primary" onclick="saveExpense()">Zapisz wydatek</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista wydatków -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📤 Historia Wydatków</div>
+          <input class="form-input" id="expenses-filter-month" type="month"
+            style="padding:0.3rem 0.6rem;font-size:0.75rem;width:160px"
+            onchange="loadExpenses()"/>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <table class="western-table">
+            <thead>
+              <tr><th>Data</th><th>Kto</th><th>Na co</th><th>Kwota</th><th></th></tr>
+            </thead>
+            <tbody id="expenses-body">
+              <tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PODATEK ===== -->
+    <section class="page-section" id="section-tax">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Podatek</div>
+          <div class="page-subtitle">Zestawienie do rozliczeń podatkowych</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📑 Miesięczne Zestawienie</div>
+          <input class="form-input" id="tax-filter-month" type="month"
+            style="padding:0.3rem 0.6rem;font-size:0.75rem;width:160px"
+            onchange="loadTax()"/>
+        </div>
+        <div class="panel-body">
+          <div class="cards-grid" id="tax-cards" style="margin-bottom:1.5rem">
+            <div class="stat-card">
+              <div class="stat-card-icon">💵</div>
+              <div class="stat-card-label">Przychód brutto</div>
+              <div class="stat-card-value" id="tax-income">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon">📤</div>
+              <div class="stat-card-label">Wydatki</div>
+              <div class="stat-card-value" id="tax-exp">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon">💰</div>
+              <div class="stat-card-label">Dochód netto</div>
+              <div class="stat-card-value" id="tax-net">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon">📑</div>
+              <div class="stat-card-label">Podatek (%)</div>
+              <div class="stat-card-value" id="tax-rate-display">—</div>
+            </div>
+          </div>
+
+          <!-- Ustaw stawkę podatkową -->
+          <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
+            <div class="form-group">
+              <label>Stawka podatkowa (%)</label>
+              <input class="form-input" id="tax-rate-input" type="number" min="0" max="100" step="0.5"
+                placeholder="np. 19" style="width:150px"/>
+            </div>
+            <button class="btn btn-primary" onclick="saveTaxRate()">Ustaw stawkę</button>
+          </div>
+
+          <div style="margin-top:1.5rem;padding:1rem;border:1px solid rgba(196,122,43,0.2);background:rgba(196,122,43,0.05)">
+            <p style="font-family:var(--font-type);font-size:0.78rem;color:var(--dust);line-height:1.8">
+              ⚠ Stawka podatkowa zostanie ustalona przez właściciela po konsultacji z księgowym.<br>
+              Powyższe zestawienie służy jako podgląd do celów rozliczeniowych.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MAGAZYN ===== -->
+    <section class="page-section" id="section-warehouse">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Magazyn</div>
+          <div class="page-subtitle">Stany · Przyjęcia · Wydania</div>
+        </div>
+        <button class="btn btn-primary" onclick="showAddItemModal()">+ Nowa pozycja</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🏚️ Stany Bieżące</div>
+          <input class="form-input" id="warehouse-search"
+            style="width:200px;padding:0.35rem 0.7rem;font-size:0.75rem"
+            placeholder="Szukaj..." oninput="filterWarehouse(this.value)"/>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <table class="western-table" id="warehouse-table">
+            <thead>
+              <tr><th>Pozycja</th><th>Stan</th><th>Jednostka</th><th>Próg alertu</th><th>Akcje</th></tr>
+            </thead>
+            <tbody id="warehouse-body">
+              <tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal dodawania/edycji pozycji -->
+      <div id="warehouse-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <div class="modal-header">
+            <div class="panel-title" id="warehouse-modal-title">Nowa pozycja</div>
+            <button class="btn btn-ghost" style="padding:0.2rem 0.5rem" onclick="closeItemModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Wybierz z katalogu (opcjonalnie)</label>
+                <select class="form-select" id="wh-catalog-sel" onchange="onCatalogSelect(this)">
+                  <option value="">— własna pozycja —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Nazwa</label>
+                <input class="form-input" id="wh-name" type="text" placeholder="np. Pasza"/>
+              </div>
+              <div class="form-group">
+                <label>Ikona (emoji)</label>
+                <input class="form-input" id="wh-icon" type="text" placeholder="🌾" maxlength="4"/>
+              </div>
+              <div class="form-grid form-grid-2">
+                <div class="form-group">
+                  <label>Ilość początkowa</label>
+                  <input class="form-input" id="wh-qty" type="number" min="0" placeholder="0"/>
+                </div>
+                <div class="form-group">
+                  <label>Jednostka</label>
+                  <input class="form-input" id="wh-unit" type="text" placeholder="kg / szt. / l"/>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Próg alertu (niski stan)</label>
+                <input class="form-input" id="wh-threshold" type="number" min="0" placeholder="5"/>
+              </div>
+            </div>
+            <div style="margin-top:1rem;display:flex;gap:0.75rem">
+              <button class="btn btn-primary" onclick="saveWarehouseItem()">Zapisz</button>
+              <button class="btn btn-ghost"   onclick="closeItemModal()">Anuluj</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel ruchów -->
+      <div class="panel" id="move-panel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title" id="move-panel-title">Ruch magazynowy</div>
+          <button class="btn btn-ghost" style="padding:0.2rem 0.5rem" onclick="closeMovePanel()">✕</button>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label>Typ</label>
+              <select class="form-select" id="move-type">
+                <option value="przyjecie">Przyjęcie</option>
+                <option value="wydanie">Wydanie</option>
+                <option value="korekta">Korekta stanu</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Ilość</label>
+              <input class="form-input" id="move-qty" type="number" min="1" placeholder="0"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Uwagi</label>
+              <input class="form-input" id="move-note" type="text" placeholder="Opcjonalne..."/>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem">
+            <button class="btn btn-primary" onclick="saveMove()">Zapisz ruch</button>
+            <button class="btn btn-ghost"   onclick="closeMovePanel()">Anuluj</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KONTA ===== -->
+    <section class="page-section" id="section-accounts">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Konta Dostępowe</div>
+          <div class="page-subtitle">Zatrudnianie &middot; Zarządzanie rolami</div>
+        </div>
+      </div>
+
+      <!-- Zatrudnij pracownika -->
+      <div class="panel" id="hire-panel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title">&#129309; Zatrudnij Nowego Pracownika</div>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label>Imi&#281; i nazwisko</label>
+              <input class="form-input" id="hire-name" type="text" placeholder="Jan Kowalski"/>
+            </div>
+            <div class="form-group">
+              <label>Adres e-mail</label>
+              <input class="form-input" id="hire-email" type="email" placeholder="jan@stajnia.pl"/>
+            </div>
+            <div class="form-group">
+              <label>Has&#322;o tymczasowe</label>
+              <div style="position:relative">
+                <input class="form-input" id="hire-pass" type="password" placeholder="Min. 6 znak&#243;w" style="padding-right:2.5rem"/>
+                <button onclick="togglePassVisibility()" style="position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--amber);cursor:pointer;font-size:1rem" id="pass-eye">&#128065;</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Rola</label>
+              <select class="form-select" id="hire-role">
+                <option value="worker">Pracownik</option>
+                <option value="viewer">Obserwator</option>
+                <option value="owner">W&#322;a&#347;ciciel</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="hireEmployee()">&#129309; Zatrudnij</button>
+            <span style="font-family:var(--font-type);font-size:0.72rem;color:rgba(200,176,128,0.5);line-height:1.5">
+              Pracownik otrzyma konto i mo&#380;e si&#281; zalogowa&#263; podanymi danymi.
+            </span>
+          </div>
+          <div id="hire-result" style="display:none;margin-top:0.75rem"></div>
+        </div>
+      </div>
+
+      <!-- Lista kont -->
+      <div id="accounts-content">
+        <div style="font-family:var(--font-type);color:var(--dust);padding:1rem">&#321;adowanie...</div>
+      </div>
+    </section>
+
+    <!-- ===== NOTATKI ===== -->
+    <section class="page-section" id="section-notes">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Notatki</div>
+          <div class="page-subtitle">Tablica ogłoszeń · Informacje dla zespołu</div>
+        </div>
+      </div>
+
+      <!-- Dodaj notatkę — pracownik i właściciel -->
+      <div class="panel" id="add-note-panel">
+        <div class="panel-header">
+          <div class="panel-title">📌 Nowa Notatka</div>
+          <div style="display:flex;gap:0.5rem">
+            <select class="form-select" id="note-priority" style="padding:0.3rem 0.6rem;font-size:0.75rem;width:auto">
+              <option value="normal">Zwykła</option>
+              <option value="important">Ważna</option>
+              <option value="urgent">Pilna</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Tytuł</label>
+              <input class="form-input" id="note-title" type="text" placeholder="Temat notatki..."/>
+            </div>
+            <div class="form-group">
+              <label>Treść</label>
+              <textarea class="form-textarea" id="note-body" placeholder="Treść ogłoszenia lub notatki..."></textarea>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem">
+            <button class="btn btn-primary" onclick="saveNote()">📌 Przypnij notatkę</button>
+            <button class="btn btn-ghost"   onclick="clearNoteForm()">Wyczyść</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista notatek -->
+      <div id="notes-list">
+        <div style="font-family:var(--font-type);color:var(--dust);padding:1rem">Ładowanie...</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- MODAL DIALOGU — zamiast confirm() przeglądarki -->
+<div id="western-dialog" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <div class="panel-title">⚠ Potwierdzenie</div>
+    </div>
+    <div class="modal-body">
+      <p id="dialog-msg" style="font-family:var(--font-body);font-size:1rem;color:var(--cream);line-height:1.6;margin-bottom:1.5rem;white-space:pre-line"></p>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="_dialogCancel()">Anuluj</button>
+        <button class="btn btn-danger" id="dialog-confirm-btn" onclick="_dialogConfirm()">Potwierdź</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DIALOGU — zamiast confirm() przeglądarki -->
+<div id="western-dialog" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <div class="panel-title">⚠ Potwierdzenie</div>
+    </div>
+    <div class="modal-body">
+      <p id="dialog-msg" style="font-family:var(--font-body);font-size:1rem;color:var(--cream);line-height:1.6;margin-bottom:1.5rem;white-space:pre-line"></p>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="_dialogCancel()">Anuluj</button>
+        <button class="btn btn-danger" id="dialog-confirm-btn" onclick="_dialogConfirm()">Potwierdź</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
