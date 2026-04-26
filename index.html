@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="version" content="1777210343"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>🐎 Stajnia Strawberry</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐎</text></svg>"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css?v=1777233112"/>
+  <link rel="stylesheet" href="style.css?v=1977239636"/>
 </head>
 <body>
 
@@ -233,6 +236,12 @@
           <div class="stat-card-label">Wydatki (miesiąc)</div>
           <div class="stat-card-value" id="stat-expenses">—</div>
           <div class="stat-card-change neg">zatwierdzone przez właściciela</div>
+        </div>
+        <div class="stat-card stat-card--treasury">
+          <div class="stat-card-icon">💵</div>
+          <div class="stat-card-label">Stan kasy stajni</div>
+          <div class="stat-card-value" id="stat-treasury">—</div>
+          <div class="stat-card-change">50% sprzedaży − wydatki − wypłaty</div>
         </div>
       </div>
 
@@ -817,7 +826,49 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=1777233112"></script>
+<script type="module" src="app.js?v=1977239636"></script>
+
+<!-- MODAL PROMOCJI -->
+<div id="promo-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <div class="panel-title">🏷 Promocja</div>
+      <span id="promo-item-name" style="font-family:var(--font-type);font-size:0.75rem;color:var(--dust)"></span>
+    </div>
+    <div class="modal-body">
+      <!-- Zakładki -->
+      <div class="promo-tabs">
+        <button class="promo-tab active" id="promo-tab-pct" onclick="switchPromoTab('pct')">% Procent</button>
+        <button class="promo-tab" id="promo-tab-amt" onclick="switchPromoTab('amt')">$ Kwota</button>
+      </div>
+
+      <!-- Zakładka procentowa -->
+      <div id="promo-panel-pct" class="promo-panel">
+        <div class="form-group" style="margin-top:1rem">
+          <label>Zniżka (%)</label>
+          <input class="form-input" id="promo-pct-input" type="number" min="1" max="99"
+            placeholder="np. 20" oninput="updatePromoPreview()"/>
+        </div>
+        <div class="promo-preview" id="promo-preview-pct"></div>
+      </div>
+
+      <!-- Zakładka kwotowa -->
+      <div id="promo-panel-amt" class="promo-panel hidden">
+        <div class="form-group" style="margin-top:1rem">
+          <label>Nowa cena za sztukę ($)</label>
+          <input class="form-input" id="promo-amt-input" type="number" min="0" step="0.01"
+            placeholder="np. 10.00" oninput="updatePromoPreview()"/>
+        </div>
+        <div class="promo-preview" id="promo-preview-amt"></div>
+      </div>
+
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.5rem">
+        <button class="btn btn-ghost" onclick="closePromoModal()">Anuluj</button>
+        <button class="btn btn-primary" onclick="applyPromo()">✓ Zastosuj promocję</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- STOPKA -->
 

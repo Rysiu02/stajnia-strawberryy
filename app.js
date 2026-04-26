@@ -366,12 +366,14 @@ async function loadDashboard() {
     /* Rachunki — wszystkie, filtrujemy po miesiącu w JS */
     const rSnap = await getDocs(collection(db,'receipts'));
     let totalSales=0, totalStable=0, totalWorkers=0;
+    let allTimeTotal=0; // łączna kwota wszystkich rachunków (100%) — stajnia fizycznie trzyma całą gotówkę
     const workerMap = {};
     const recentRows = [];
 
     const week = currentWeek();
     rSnap.forEach(d => {
       const r = d.data();
+      allTimeTotal += r.total || 0; // zlicz 100% ze wszystkich rachunków
       /* Dla nowych rachunków sprawdź pole week, dla starych wylicz z daty */
       const rWeek = r.week || dateToWeek(r.createdAt);
       if (rWeek !== week) return;
@@ -387,8 +389,10 @@ async function loadDashboard() {
 
     /* Wypłacone — filtruj po bieżącym tygodniu */
     const pSnap = await getDocs(collection(db,'payouts'));
+    let allTimePaid=0; // łączne wypłaty ze wszystkich tygodni
     pSnap.forEach(d => {
       const p = d.data();
+      allTimePaid += p.amount || 0; // zlicz wszystkie wypłaty
       const pKey = p.week || p.month;
       if (pKey !== week) return;
       if (workerMap[p.workerUid]) workerMap[p.workerUid].paid += p.amount || 0;
@@ -396,16 +400,25 @@ async function loadDashboard() {
 
     /* Wydatki */
     const eSnap = await getDocs(collection(db,'expenses'));
-    let totalExp = 0;
+    let totalExp = 0, allTimeExp = 0;
     eSnap.forEach(d => {
       const e = d.data();
+      allTimeExp += e.amount || 0; // wszystkie wydatki
       if (e.month === month) totalExp += e.amount || 0;
     });
+
+    /* Stan kasy stajni = 100% wpływów ze wszystkich rachunków − wszystkie wydatki − wszystkie wypłaty */
+    const treasury = allTimeTotal - allTimeExp - allTimePaid;
 
     document.getElementById('stat-today').textContent       = fmt(totalSales);
     document.getElementById('stat-stable').textContent      = fmt(totalStable);
     document.getElementById('stat-workers-tab').textContent = fmt(totalWorkers);
     document.getElementById('stat-expenses').textContent    = fmt(totalExp);
+    const tEl = document.getElementById('stat-treasury');
+    if (tEl) {
+      tEl.textContent = fmt(treasury);
+      tEl.style.color = treasury >= 0 ? 'var(--pale-gold)' : '#c94040';
+    }
 
     /* Tabela zakładek */
     const tbody = document.getElementById('workers-tabs-body');
@@ -561,13 +574,24 @@ function renderBasket() {
              <span style="display:none;font-size:1.2rem">${item.icon}</span>`
           : `<span style="font-size:1.2rem">${item.icon}</span>`}
       </div>
-      <span class="basket-name">${item.name}</span>
+      <span class="basket-name">${item.name}
+        ${item.discountLabel ? `<span class="basket-promo-badge">${item.discountLabel}</span>` : ''}
+      </span>
       <div class="basket-qty-ctrl">
         ${!item.isHorse ? `<button onclick="changeQty(${idx},-1)">−</button>` : ''}
         <span>${item.qty}</span>
         ${!item.isHorse ? `<button onclick="changeQty(${idx},1)">+</button>` : ''}
       </div>
-      <span class="basket-price">${fmt(item.price * item.qty)}</span>
+      <div class="basket-price-wrap">
+        ${item.originalPrice != null
+          ? `<span class="basket-price-orig">${fmt(item.originalPrice * item.qty)}</span>
+             <span class="basket-price basket-price--promo">${fmt(item.price * item.qty)}</span>`
+          : `<span class="basket-price">${fmt(item.price * item.qty)}</span>`}
+      </div>
+      <button class="btn basket-promo-btn" title="Dodaj promocję" onclick="openPromoModal(${idx})">🏷</button>
+      ${item.originalPrice != null
+        ? `<button class="btn btn-ghost" style="padding:0.15rem 0.4rem;font-size:0.65rem" title="Usuń promocję" onclick="removePromo(${idx})">↩</button>`
+        : ''}
       <button class="btn btn-danger" style="padding:0.15rem 0.4rem;font-size:0.7rem" onclick="removeFromBasket(${idx})">✕</button>
     </div>`).join('');
   recalcBasket();
@@ -605,6 +629,103 @@ function recalcBasket() {
   document.getElementById('rec-stable-cut').textContent = fmt(half);
   document.getElementById('rec-worker-cut').textContent = fmt(half);
 }
+
+/* =====================================================
+   PROMOCJE
+   ===================================================== */
+let _promoIdx     = null;
+let _promoTab     = 'pct';
+
+window.openPromoModal = function(idx) {
+  const item = basket[idx];
+  if (!item) return;
+  _promoIdx = idx;
+  _promoTab = 'pct';
+  document.getElementById('promo-item-name').textContent = item.name;
+  document.getElementById('promo-pct-input').value = '';
+  document.getElementById('promo-amt-input').value = '';
+  document.getElementById('promo-preview-pct').textContent = '';
+  document.getElementById('promo-preview-amt').textContent = '';
+  switchPromoTab('pct');
+  document.getElementById('promo-modal').classList.remove('hidden');
+};
+
+window.closePromoModal = function() {
+  document.getElementById('promo-modal').classList.add('hidden');
+  _promoIdx = null;
+};
+
+window.switchPromoTab = function(tab) {
+  _promoTab = tab;
+  document.getElementById('promo-tab-pct').classList.toggle('active', tab === 'pct');
+  document.getElementById('promo-tab-amt').classList.toggle('active', tab === 'amt');
+  document.getElementById('promo-panel-pct').classList.toggle('hidden', tab !== 'pct');
+  document.getElementById('promo-panel-amt').classList.toggle('hidden', tab !== 'amt');
+  updatePromoPreview();
+};
+
+window.updatePromoPreview = function() {
+  const item = basket[_promoIdx];
+  if (!item) return;
+  const origPrice = item.originalPrice ?? item.price;
+
+  if (_promoTab === 'pct') {
+    const pct = parseFloat(document.getElementById('promo-pct-input').value);
+    const el  = document.getElementById('promo-preview-pct');
+    if (!isNaN(pct) && pct > 0 && pct < 100) {
+      const newPrice = origPrice * (1 - pct / 100);
+      el.textContent = `Cena za szt.: ${fmt(origPrice)} → ${fmt(newPrice)} (−${pct}%)`;
+      el.className = 'promo-preview promo-preview--ok';
+    } else {
+      el.textContent = pct >= 100 ? '⚠ Zniżka nie może wynosić 100% lub więcej' : '';
+      el.className = 'promo-preview';
+    }
+  } else {
+    const newPrice = parseFloat(document.getElementById('promo-amt-input').value);
+    const el       = document.getElementById('promo-preview-amt');
+    if (!isNaN(newPrice) && newPrice >= 0) {
+      const saved = origPrice - newPrice;
+      el.textContent = `Cena za szt.: ${fmt(origPrice)} → ${fmt(newPrice)} (−${fmt(saved)})`;
+      el.className = 'promo-preview promo-preview--ok';
+    } else {
+      el.textContent = '';
+      el.className = 'promo-preview';
+    }
+  }
+};
+
+window.applyPromo = function() {
+  const item = basket[_promoIdx];
+  if (!item) return;
+  const origPrice = item.originalPrice ?? item.price;
+  let newPrice;
+
+  if (_promoTab === 'pct') {
+    const pct = parseFloat(document.getElementById('promo-pct-input').value);
+    if (isNaN(pct) || pct <= 0 || pct >= 100) { showToast('⚠ Podaj zniżkę od 1 do 99%'); return; }
+    newPrice = origPrice * (1 - pct / 100);
+    item.discountLabel = `−${pct}%`;
+  } else {
+    newPrice = parseFloat(document.getElementById('promo-amt-input').value);
+    if (isNaN(newPrice) || newPrice < 0) { showToast('⚠ Podaj poprawną kwotę'); return; }
+    item.discountLabel = `−${fmt(origPrice - newPrice)}`;
+  }
+
+  item.originalPrice = origPrice;
+  item.price         = Math.round(newPrice * 100) / 100;
+  closePromoModal();
+  renderBasket();
+  showToast(`✓ Promocja zastosowana dla: ${item.name}`);
+};
+
+window.removePromo = function(idx) {
+  const item = basket[idx];
+  if (!item || item.originalPrice == null) return;
+  item.price         = item.originalPrice;
+  item.originalPrice = undefined;
+  item.discountLabel = undefined;
+  renderBasket();
+};
 
 window.clearReceipt = function() {
   basket = [];
@@ -848,8 +969,8 @@ async function loadPayroll() {
         <div class="panel">
           <div class="panel-header">
             <div class="panel-title">💰 ${label}</div>
-            <span style="font-family:var(--font-type);font-size:0.7rem;color:var(--dust)">
-              Do wypłaty: <strong style="color:var(--pale-gold)">${fmt(totalRem)}</strong>
+            <span style="font-family:var(--font-type);font-size:0.85rem;color:var(--dust)">
+              Do wypłaty: <strong style="color:var(--pale-gold);font-size:0.95rem">${fmt(totalRem)}</strong>
             </span>
           </div>
           <div class="panel-body" style="padding:0">
@@ -1429,25 +1550,214 @@ const HORSE_CATALOG = {
     icon:  '🐴',
     desc:  'Muły to skrzyżowanie konia i osła — wytrzymałe, spokojne i niezawodne w trudnym terenie.',
     konie: [
-      { id:'ambercreamchampageneleopard', name:'Amber Cream Champagne Leopard', coat:'Bursztynowy Kremowy Szampan Leopard', img:'konie/muly/ambercreamchampageneleopard.png', desc:'Wyjątkowe umaszczenie łączące kremowy odcień szampana z ciemnymi cętkami rozmieszczonymi na całym ciele.' },
-      { id:'blackblanket',               name:'Black Blanket',                  coat:'Czarny Koc',                          img:'konie/muly/blackblanket.png',               desc:'Ciemnoszara maść z charakterystycznym jasnym kocem na zadzie, kontrastującym z ciemnym przodem.' },
-      { id:'blackfewspotted',            name:'Black Few Spotted',              coat:'Czarny Nieliczne Cętki',              img:'konie/muly/blackfewspotted.png',            desc:'Prawie całkowicie biały z nielicznymi czarnymi plamami — rzadkie i charakterystyczne umaszczenie.' },
-      { id:'blackleopard',               name:'Black Leopard',                  coat:'Czarny Leopard',                      img:'konie/muly/blackleopard.png',               desc:'Białe tło pokryte wyraźnymi czarnymi cętkami — jedno z najbardziej rozpoznawalnych umaszczeni.' },
-      { id:'chestnut',                   name:'Chestnut',                       coat:'Kasztanowaty',                        img:'konie/muly/chestnut.png',                   desc:'Klasyczna kasztanowata maść — ciepły, złotobrązowy odcień sierści z ciemniejszą grzywą.' },
-      { id:'classicchampagneblanket',    name:'Classic Champagne Blanket',      coat:'Klasyczny Szampan Koc',               img:'konie/muly/classicchampagneblanket.png',    desc:'Szampańska maść z białym kocem na zadzie i delikatnymi cętkami — elegancka kombinacja.' },
-      { id:'goldchampagnetobiano',       name:'Gold Champagne Tobiano',         coat:'Złoty Szampan Tobiano',               img:'konie/muly/goldchampagnetobiano.png',       desc:'Złocisto-szampański odcień z białymi plamami tobiano — ciepłe i luksusowe umaszczenie.' },
-      { id:'greynearleopard',            name:'Grey Near Leopard',              coat:'Szary Prawie Leopard',                img:'konie/muly/greynearleopard.png',            desc:'Jasne, popielate tło z delikatnymi brązowymi cętkami — subtelna odmiana umaszczenia leopard.' },
-      { id:'mealybay',                   name:'Mealy Bay',                      coat:'Karoszy Mączysty',                    img:'konie/muly/mealybay.png',                   desc:'Kasztanowato-gniade umaszczenie z charakterystycznym jaśniejszym podbrzuszem.' },
-      { id:'pangarebaybrindle',          name:'Pangare Bay Brindle',            coat:'Pangare Gniadobrązowy Prążkowany',    img:'konie/muly/pangarebaybrindle.png',          desc:'Wyjątkowe prążkowane umaszczenie z ciemnymi pasami na gniadobrązowym tle — ekstremalnie rzadkie.' },
-      { id:'redblanket',                 name:'Red Blanket',                    coat:'Czerwony Koc',                        img:'konie/muly/redblanket.png',                 desc:'Rudo-kasztanowe umaszczenie z jaśniejszym kocem na zadzie i białymi skarpetkami.' },
-      { id:'redleopard',                 name:'Red Leopard',                    coat:'Czerwony Leopard',                    img:'konie/muly/redleopard.png',                 desc:'Białe tło z rudymi cętkami — ciepłe i charakterystyczne umaszczenie leopard.' },
-      { id:'sealbay',                    name:'Seal Bay',                       coat:'Ciemnokaroszy',                       img:'konie/muly/sealbay.png',                    desc:'Bardzo ciemna, prawie czarna maść z gniadymi refleksami — elegancka i poważna.' },
-      { id:'silverbaypangare',           name:'Silver Bay Pangare',             coat:'Srebrny Gniadokaroszy Pangare',       img:'konie/muly/silverbaypangare.png',           desc:'Srebrzysty odcień gniady z pangare — biała grzywa kontrastuje z ciemnymi kończynami.' },
-      { id:'silverblackblanket',         name:'Silver Black Blanket',           coat:'Srebrno-Czarny Koc',                  img:'konie/muly/silverblackblanket.png',         desc:'Ciemny z srebrnym połyskiem i charakterystycznym białym kocem na zadzie.' },
-      { id:'smokyblackblanket',          name:'Smoky Black Blanket',            coat:'Dymno-Czarny Koc',                    img:'konie/muly/smokyblackblanket.png',          desc:'Dymno-brązowe umaszczenie z białym kocem na zadzie i białymi skarpetkami.' },
-      { id:'sootybayleopard',            name:'Sooty Bay Leopard',              coat:'Brudnokaroszy Leopard',               img:'konie/muly/sootybayleopard.png',            desc:'Pomarańczowo-gniade tło z ciemnymi cętkami — intensywne i przyciągające wzrok umaszczenie.' },
-      { id:'whitelegendary',             name:'White — Legendarny',             coat:'Biały Legendarny',                    img:'konie/muly/whitelegendary.png',             desc:'Czysto biała maść — legendarny okaz stajni Strawberry. Wyjątkowy i niepowtarzalny.', legendary:true },
-      { id:'zonkey',                     name:'Zonkey',                         coat:'Zebrowiec (Muł × Zebra)',             img:'konie/muly/zonkey.png',                     desc:'Niezwykłe skrzyżowanie muła i zebry — charakterystyczne paski na pomarańczowo-brązowym tle. Prawdziwa osobliwość!', legendary:true },
+      {
+        id:   'ambercreamchampageneleopard',
+        name: 'Amber Cream Champagne Leopard',
+        coat: 'Bursztynowy Kremowy Szampan Leopard',
+        img:  'konie/muly/ambercreamchampageneleopard.png',
+        desc: 'Wyjątkowe umaszczenie łączące kremowy odcień szampana z ciemnymi cętkami rozmieszczonymi na całym ciele.'
+      },
+      {
+        id:   'blackblanket',
+        name: 'Black Blanket',
+        coat: 'Czarny Koc',
+        img:  'konie/muly/blackblanket.png',
+        desc: 'Ciemnoszara maść z charakterystycznym jasnym kocem na zadzie, kontrastującym z ciemnym przodem.'
+      },
+      {
+        id:   'blackfewspotted',
+        name: 'Black Few Spotted',
+        coat: 'Czarny Nieliczne Cętki',
+        img:  'konie/muly/blackfewspotted.png',
+        desc: 'Prawie całkowicie biały z nielicznymi czarnymi plamami — rzadkie i charakterystyczne umaszczenie.'
+      },
+      {
+        id:   'blackleopard',
+        name: 'Black Leopard',
+        coat: 'Czarny Leopard',
+        img:  'konie/muly/blackleopard.png',
+        desc: 'Białe tło pokryte wyraźnymi czarnymi cętkami — jedno z najbardziej rozpoznawalnych umaszczeni.'
+      },
+      {
+        id:   'chestnut',
+        name: 'Chestnut',
+        coat: 'Kasztanowaty',
+        img:  'konie/muly/chestnut.png',
+        desc: 'Klasyczna kasztanowata maść — ciepły, złotobrązowy odcień sierści z ciemniejszą grzywą i ogonem.'
+      },
+      {
+        id:   'classicchampagneblanket',
+        name: 'Classic Champagne Blanket',
+        coat: 'Klasyczny Szampan Koc',
+        img:  'konie/muly/classicchampagneblanket.png',
+        desc: 'Szampańska maść z białym kocem na zadzie i delikatnymi cętkami — elegancka i rzadka kombinacja.'
+      },
+      {
+        id:   'goldchampagnetobiano',
+        name: 'Gold Champagne Tobiano',
+        coat: 'Złoty Szampan Tobiano',
+        img:  'konie/muly/goldchampagnetobiano.png',
+        desc: 'Złocisto-szampański odcień z białymi plamami tobiano — ciepłe i luksusowe umaszczenie.'
+      },
+      {
+        id:   'greynearleopard',
+        name: 'Grey Near Leopard',
+        coat: 'Szary Prawie Leopard',
+        img:  'konie/muly/greynearleopard.png',
+        desc: 'Jasne, popielate tło z delikatnymi brązowymi cętkami — subtelna odmiana umaszczenia leopard.'
+      },
+      {
+        id:   'mealybay',
+        name: 'Mealy Bay',
+        coat: 'Karoszy Mączysty',
+        img:  'konie/muly/mealybay.png',
+        desc: 'Kasztanowato-gniade umaszczenie z charakterystycznym jaśniejszym podbrzuszem — efekt mączysty.'
+      },
+      {
+        id:   'pangarebaybrindle',
+        name: 'Pangare Bay Brindle',
+        coat: 'Pangare Gniadobrązowy Prążkowany',
+        img:  'konie/muly/pangarebaybrindle.png',
+        desc: 'Wyjątkowe prążkowane umaszczenie z ciemnymi pasami na gniadobrązowym tle — ekstremalnie rzadkie.'
+      },
+      {
+        id:   'redblanket',
+        name: 'Red Blanket',
+        coat: 'Czerwony Koc',
+        img:  'konie/muly/redblanket.png',
+        desc: 'Rudo-kasztanowe umaszczenie z jaśniejszym kocem na zadzie i białymi skarpetkami na nogach.'
+      },
+      {
+        id:   'redleopard',
+        name: 'Red Leopard',
+        coat: 'Czerwony Leopard',
+        img:  'konie/muly/redleopard.png',
+        desc: 'Białe tło z rudymi cętkami leopard — ciepłe, charakterystyczne i łatwo rozpoznawalne umaszczenie.'
+      },
+      {
+        id:   'sealbay',
+        name: 'Seal Bay',
+        coat: 'Ciemnokaroszy',
+        img:  'konie/muly/sealbay.png',
+        desc: 'Bardzo ciemna, prawie czarna maść z gniadymi refleksami w świetle — elegancka i poważna.'
+      },
+      {
+        id:   'silverbaypangare',
+        name: 'Silver Bay Pangare',
+        coat: 'Srebrny Gniadokaroszy Pangare',
+        img:  'konie/muly/silverbaypangare.png',
+        desc: 'Srebrzysty odcień gniady z pangare — biała grzywa wyraźnie kontrastuje z ciemnymi kończynami.'
+      },
+      {
+        id:   'silverblackblanket',
+        name: 'Silver Black Blanket',
+        coat: 'Srebrno-Czarny Koc',
+        img:  'konie/muly/silverblackblanket.png',
+        desc: 'Ciemny z srebrnym połyskiem i charakterystycznym białym kocem na zadzie — wyraziste umaszczenie.'
+      },
+      {
+        id:   'smokyblackblanket',
+        name: 'Smoky Black Blanket',
+        coat: 'Dymno-Czarny Koc',
+        img:  'konie/muly/smokyblackblanket.png',
+        desc: 'Dymno-brązowe umaszczenie z białym kocem na zadzie i charakterystycznymi białymi skarpetkami.'
+      },
+      {
+        id:   'sootybayleopard',
+        name: 'Sooty Bay Leopard',
+        coat: 'Brudnokaroszy Leopard',
+        img:  'konie/muly/sootybayleopard.png',
+        desc: 'Pomarańczowo-gniade tło z ciemnymi cętkami — intensywne i bardzo przyciągające wzrok umaszczenie.'
+      },
+      {
+        id:   'whitelegendary',
+        name: 'White — Legendarny',
+        coat: 'Biały Legendarny',
+        img:  'konie/muly/whitelegendary.png',
+        desc: 'Czysto biała maść — legendarny okaz stajni Strawberry. Wyjątkowy i absolutnie niepowtarzalny.',
+        legendary: true
+      },
+      {
+        id:   'zonkey',
+        name: 'Zonkey',
+        coat: 'Zebrowiec (Muł × Zebra)',
+        img:  'konie/muly/zonkey.png',
+        desc: 'Niezwykłe skrzyżowanie muła i zebry — charakterystyczne paski na pomarańczowo-brązowym tle. Prawdziwa osobliwość!',
+        legendary: true
+      },
+    ]
+  }
+  ,
+  amerykanskiosiolmamut: {
+    label: 'Amerykański Osioł Mamut',
+    icon:  '🫏',
+    desc:  'Amerykański Osioł Mamut — potężny, spokojny i wytrzymały. Jeden z największych przedstawicieli swojego gatunku.',
+    konie: [
+      {
+        id:   'legendarybaypangare',
+        name: 'Legendary Bay Pangare',
+        coat: 'Legendarny Gniadokaroszy Pangare',
+        img:  'konie/amerykanskiosiolmamut/legendarybaypangare.png',
+        desc: 'Legendarny okaz o głębokiej gniadej maści z charakterystycznym pangare — jaśniejszym podbrzuszem. Wyjątkowy i rzadko spotykany.',
+        legendary: true
+      },
+      {
+        id:   'legendaryblacknearleopard',
+        name: 'Legendary Black Near Leopard',
+        coat: 'Legendarny Czarny Prawie Leopard',
+        img:  'konie/amerykanskiosiolmamut/legendaryblacknearleopard.png',
+        desc: 'Legendarny okaz o czarnej maści z białymi i czarnymi plamami w stylu leopard. Jeden z najbardziej imponujących osobników.',
+        legendary: true
+      },
+      {
+        id:   'rosegreybrindle',
+        name: 'Rose Grey Brindle',
+        coat: 'Różowoszary Prążkowany',
+        img:  'konie/amerykanskiosiolmamut/rosegreybrindle.png',
+        desc: 'Ciemna maść z charakterystycznymi jasnobrązowymi prążkami i delikatnymi białymi plamami — niezwykłe i rzadkie umaszczenie.'
+      },
+      {
+        id:   'smokyblacktovero',
+        name: 'Smoky Black Tovero',
+        coat: 'Dymno-Czarny Tovero',
+        img:  'konie/amerykanskiosiolmamut/smokyblacktovero.png',
+        desc: 'Czarne umaszczenie tovero z charakterystyczną białą łatą na twarzy i niebieskim okiem — elegancki i wyrazisty.'
+      },
+      {
+        id:   'blacktovero',
+        name: 'Black Tovero',
+        coat: 'Czarny Tovero',
+        img:  'konie/amerykanskiosiolmamut/blacktovero.png',
+        desc: 'Białe tło z dużymi czarnymi plamami tovero — kontrastowe i bardzo charakterystyczne umaszczenie.'
+      },
+      {
+        id:   'classiccreamchampagneleopard',
+        name: 'Classic Cream Champagne Leopard',
+        coat: 'Klasyczny Kremowy Szampan Leopard',
+        img:  'konie/amerykanskiosiolmamut/classiccreamchampagneleopard.png',
+        desc: 'Kremowo-szampańskie tło pokryte brązowymi cętkami leopard — delikatne i eleganckie umaszczenie.'
+      },
+      {
+        id:   'cremellorabicano',
+        name: 'Cremello Rabicano',
+        coat: 'Kremello Rabicano',
+        img:  'konie/amerykanskiosiolmamut/cremellorabicano.png',
+        desc: 'Niemal biała maść cremello z delikatnym rabicano — kremowy odcień z subtelnym połyskiem sierści.'
+      },
+      {
+        id:   'dominantwhitebrindle',
+        name: 'Dominant White Brindle',
+        coat: 'Dominujący Biały Prążkowany',
+        img:  'konie/amerykanskiosiolmamut/dominantwhitebrindle.png',
+        desc: 'Prawie biała maść z ledwo widocznymi jasnymi prążkami — wyjątkowo rzadkie i subtelne umaszczenie.'
+      },
+      {
+        id:   'goldcreamchampagneblanket',
+        name: 'Gold Cream Champagne Blanket',
+        coat: 'Złocisty Kremowy Szampan Koc',
+        img:  'konie/amerykanskiosiolmamut/goldcreamchampagneblanket.png',
+        desc: 'Kremowo-złocisty szampan z białym kocem na zadzie — ciepłe i luksusowe umaszczenie.'
+      },
     ]
   }
   /* Kolejne kategorie dodaj tutaj w tym samym formacie */
@@ -1486,11 +1796,14 @@ window.openCatalogCategory = function(catId) {
   if (sub) sub.textContent = cat.desc;
 
   const grid = document.getElementById('cat-horses-grid');
+  grid.className = 'cat-horses-grid cat-' + catId;
   grid.innerHTML = cat.konie.map(h => `
     <div class="cat-horse-card ${h.legendary ? 'legendary' : ''}"
       onclick="openHorseDetail('${catId}','${h.id}')">
       ${h.legendary ? '<div class="cat-horse-badge">⭐ Legendarny</div>' : ''}
-      <img class="cat-horse-img" src="${h.img}" alt="${h.name}" loading="lazy"/>
+      <div class="cat-horse-img-wrap">
+        <img class="cat-horse-img" src="${h.img}" alt="${h.name}" loading="lazy"/>
+      </div>
       <div class="cat-horse-body">
         <div class="cat-horse-name">${h.name}</div>
         <div class="cat-horse-coat">${h.coat}</div>

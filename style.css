@@ -497,7 +497,7 @@ main {
 .stat-card-icon { font-size: 1.5rem; margin-bottom: 0.5rem; opacity: 0.8; }
 .stat-card-label {
   font-family: var(--font-type);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--dust);
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -511,11 +511,21 @@ main {
 }
 .stat-card-change {
   font-family: var(--font-type);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   margin-top: 0.25rem;
 }
 .stat-card-change.pos { color: #4a8c5c; }
 .stat-card-change.neg { color: var(--red); }
+
+/* Kafelek kasy stajni — wyróżniony */
+.stat-card--treasury {
+  border-color: rgba(212,162,78,0.6);
+  background: linear-gradient(135deg, rgba(60,32,8,0.9), rgba(20,12,2,0.95));
+  box-shadow: 0 0 18px rgba(196,122,43,0.12), inset 0 0 30px rgba(0,0,0,0.3);
+}
+.stat-card--treasury::before { opacity: 0.6; }
+.stat-card--treasury .stat-card-label { color: var(--gold); }
+.stat-card--treasury .stat-card-value { font-size: 1.75rem; }
 
 /* =====================================================
    PANEL / BOARD
@@ -554,9 +564,9 @@ main {
   text-align: left;
   padding: 0.6rem 1rem;
   font-family: var(--font-head);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.15em;
   color: var(--amber);
   text-transform: uppercase;
   border-bottom: 1px solid rgba(196,122,43,0.3);
@@ -917,8 +927,8 @@ main {
 
 .note-meta {
   font-family: var(--font-type);
-  font-size: 0.7rem;
-  color: rgba(200,176,128,0.45);
+  font-size: 0.78rem;
+  color: rgba(200,176,128,0.55);
   letter-spacing: 0.05em;
 }
 
@@ -939,8 +949,8 @@ main {
    ===================================================== */
 .catalog-section-label {
   font-family: var(--font-type);
-  font-size: 0.7rem;
-  letter-spacing: 0.25em;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--amber);
   margin-bottom: 0.6rem;
@@ -986,7 +996,7 @@ main {
 }
 .catalog-tile-name {
   font-family: var(--font-head);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--cream);
   letter-spacing: 0.04em;
@@ -1088,6 +1098,83 @@ main {
   text-align: right;
   font-size: 0.85rem;
 }
+.basket-price-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 70px;
+}
+.basket-price-orig {
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  color: rgba(200,176,128,0.4);
+  text-decoration: line-through;
+}
+.basket-price--promo {
+  color: #6abf7e;
+}
+.basket-promo-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  background: rgba(106,191,126,0.15);
+  border: 1px solid rgba(106,191,126,0.4);
+  color: #6abf7e;
+  font-family: var(--font-type);
+  font-size: 0.6rem;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+.basket-promo-btn {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  border-color: rgba(106,191,126,0.3);
+  color: #6abf7e;
+  background: rgba(106,191,126,0.08);
+}
+.basket-promo-btn:hover {
+  background: rgba(106,191,126,0.2);
+  border-color: #6abf7e;
+}
+
+/* ── MODAL PROMOCJI ── */
+.promo-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(196,122,43,0.25);
+  margin-bottom: 0.25rem;
+}
+.promo-tab {
+  flex: 1;
+  padding: 0.55rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--dust);
+  font-family: var(--font-head);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.promo-tab:hover { color: var(--gold); }
+.promo-tab.active {
+  color: var(--pale-gold);
+  border-bottom-color: var(--amber);
+}
+.promo-panel { }
+.promo-panel.hidden { display: none; }
+.promo-preview {
+  margin-top: 0.6rem;
+  font-family: var(--font-type);
+  font-size: 0.78rem;
+  color: var(--dust);
+  min-height: 1.2rem;
+}
+.promo-preview--ok { color: #6abf7e; }
 
 /* =====================================================
    MODAL DIALOGU — zamiast confirm() przeglądarki
@@ -1274,13 +1361,8 @@ main {
 #public-screen.hidden { display: none; }
 
 /* Poziomy nawigacji */
-.pub-level {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.pub-level.hidden { display: none !important; }
+
+
 
 /* ── START SCREEN — jeden kafelek ── */
 #start-screen {
@@ -1433,30 +1515,21 @@ main {
   padding: 2rem;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   align-content: center;
+  scrollbar-width: thin;
+  scrollbar-color: var(--amber) var(--saddle);
 }
-.cat-category-card {
-  width: 220px;
-  padding: 2rem 1.25rem 1.75rem;
-  border: 1px solid rgba(196,122,43,0.25);
-  background: linear-gradient(160deg, rgba(46,26,14,0.85), rgba(16,10,2,0.95));
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.25s ease;
-  position: relative; overflow: hidden;
+.cat-categories-grid::-webkit-scrollbar { width: 8px; }
+.cat-categories-grid::-webkit-scrollbar-track { background: rgba(16,10,2,0.8); }
+.cat-categories-grid::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--amber), var(--rust));
+  border-radius: 2px;
 }
-.cat-category-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--amber), transparent);
-  opacity: 0; transition: opacity 0.25s;
-}
-.cat-category-card:hover {
-  border-color: var(--amber);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.5), 0 0 20px rgba(196,122,43,0.12);
-}
-.cat-category-card:hover::before { opacity: 1; }
+
+
+
+
 .cat-cat-icon { font-size: 3rem; margin-bottom: 0.65rem; line-height: 1; }
 .cat-cat-name {
   font-family: var(--font-title);
@@ -1473,65 +1546,54 @@ main {
 }
 
 /* ── SIATKA KONI ── */
-.cat-horses-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 1rem;
-  padding: 1.25rem 2rem 2rem;
-  overflow-y: auto;
-  flex: 1;
-  align-content: start;
-}
-.cat-horse-card {
-  border: 1px solid rgba(196,122,43,0.2);
-  background: linear-gradient(160deg, rgba(30,16,5,0.9), rgba(10,6,1,0.95));
-  cursor: pointer;
-  transition: all 0.2s ease;
-  overflow: hidden;
-  position: relative;
-}
-.cat-horse-card:hover {
-  border-color: var(--amber);
-  box-shadow: 0 0 15px rgba(196,122,43,0.2);
-  transform: translateY(-2px);
-}
-.cat-horse-card.legendary { border-color: rgba(180,130,255,0.4); }
-.cat-horse-card.legendary:hover { border-color: #b07ae8; box-shadow: 0 0 15px rgba(122,74,191,0.25); }
-.cat-horse-img {
-  width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
-  transition: transform 0.3s ease;
-}
-.cat-horse-card:hover .cat-horse-img { transform: scale(1.05); }
-.cat-horse-body {
-  padding: 0.6rem 0.75rem 0.7rem;
-  border-top: 1px solid rgba(196,122,43,0.1);
-}
-.cat-horse-name {
-  font-family: var(--font-head); font-size: 0.72rem; font-weight: 700;
-  color: var(--cream); line-height: 1.3; margin-bottom: 0.15rem;
-}
-.cat-horse-coat { font-family: var(--font-type); font-size: 0.62rem; color: var(--dust); }
-.cat-horse-badge {
-  position: absolute; top: 0.4rem; right: 0.4rem;
-  padding: 0.1rem 0.4rem;
-  background: rgba(122,74,191,0.7); border: 1px solid #b07ae8; color: #d4b0ff;
-  font-family: var(--font-head); font-size: 0.55rem; font-weight: 700; letter-spacing: 0.08em;
-}
+
+
+/* Scrollbar webkit — Chrome/Safari/Edge */
+
+
+
+
+
+
+
+
+
+
+.cat-horse-card:hover 
+
+
+
+
 
 /* ── SZCZEGÓŁY KONIA ── */
 .horse-detail-body {
-  display: grid; grid-template-columns: 1fr 1fr;
-  flex: 1; overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
-.horse-detail-img-wrap { overflow: hidden; background: rgba(0,0,0,0.4); }
+.horse-detail-img-wrap {
+  width: 100%;
+  height: 400px;
+  flex-shrink: 0;
+  background: rgba(6,4,1,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
 .horse-detail-img-wrap img {
-  width: 100%; height: 100%; object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   filter: brightness(1.05) contrast(1.05);
 }
 .horse-detail-info {
-  padding: 2rem; overflow-y: auto;
-  border-left: 1px solid rgba(196,122,43,0.2);
-  display: flex; flex-direction: column;
+  padding: 2rem;
+  border-top: 1px solid rgba(196,122,43,0.2);
+  display: flex;
+  flex-direction: column;
 }
 .horse-detail-category {
   font-family: var(--font-type); font-size: 0.65rem;
@@ -1582,10 +1644,9 @@ main {
 
 /* Responsive */
 @media(max-width: 768px) {
-  .horse-detail-body { grid-template-columns: 1fr; grid-template-rows: 240px 1fr; }
-  .horse-detail-img-wrap { height: 240px; }
-  .horse-detail-info { border-left: none; border-top: 1px solid rgba(196,122,43,0.2); padding: 1.25rem; }
-  .cat-horses-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); padding: 1rem; }
+  .horse-detail-img-wrap { height: 260px; }
+  .horse-detail-info { padding: 1.25rem; }
+  
   .pub-top-bar { padding: 0.75rem 1rem; }
 }
 
@@ -1611,4 +1672,166 @@ main {
   object-fit: contain;
   display: block;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+}
+
+/* Opis pod kartą konia w katalogu */
+
+
+/* Większa karta gdy jest opis */
+
+
+
+
+/* =====================================================
+   KATALOG KONI — kafelki i siatka
+   ===================================================== */
+
+/* Poziomy pub-level */
+.pub-level {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-height: 0;
+}
+.pub-level.hidden { display: none !important; }
+.cat-screen, .horses-screen, .horse-detail-screen {
+  display: flex; flex-direction: column;
+  flex: 1; min-height: 0; width: 100%;
+}
+.cat-screen.hidden, .horses-screen.hidden, .horse-detail-screen.hidden {
+  display: none !important;
+}
+
+/* Kafelki kategorii — równe rozmiary */
+.cat-category-card {
+  width: 240px;
+  height: 200px;
+  padding: 1.5rem 1.25rem;
+  border: 1px solid rgba(196,122,43,0.25);
+  background: linear-gradient(160deg, rgba(46,26,14,0.85), rgba(16,10,2,0.95));
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.cat-category-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  opacity: 0; transition: opacity 0.25s;
+}
+.cat-category-card:hover {
+  border-color: var(--amber);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+}
+.cat-category-card:hover::before { opacity: 1; }
+
+/* Siatka koni — identyczna dla wszystkich kategorii */
+.cat-horses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  padding: 1.25rem 2rem 2rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--amber) var(--saddle);
+}
+.cat-horses-grid::-webkit-scrollbar { width: 8px; }
+.cat-horses-grid::-webkit-scrollbar-track { background: rgba(16,10,2,0.8); }
+.cat-horses-grid::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--amber), var(--rust));
+  border-radius: 2px;
+}
+
+/* Karta konia */
+.cat-horse-card {
+  border: 1px solid rgba(196,122,43,0.2);
+  background: linear-gradient(160deg, rgba(30,16,5,0.9), rgba(10,6,1,0.95));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: visible;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.cat-horse-card:hover {
+  border-color: var(--amber);
+  box-shadow: 0 0 15px rgba(196,122,43,0.2);
+  transform: translateY(-2px);
+}
+.cat-horse-card.legendary { border-color: rgba(180,130,255,0.4); }
+.cat-horse-card.legendary:hover {
+  border-color: #b07ae8;
+  box-shadow: 0 0 15px rgba(122,74,191,0.25);
+}
+
+/* Zdjęcie — stała wysokość dla wszystkich kategorii */
+.cat-horse-img-wrap {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  background: rgba(8, 5, 1, 0.9);
+}
+.cat-horse-img {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  display: block;
+  transition: transform 0.3s ease;
+}
+.cat-horse-card:hover .cat-horse-img { transform: scale(1.06); }
+
+/* Tekst pod zdjęciem — tylko nazwa i umaszczenie, BEZ opisu */
+.cat-horse-body {
+  padding: 0.55rem 0.75rem 0.65rem;
+  border-top: 1px solid rgba(196,122,43,0.12);
+}
+.cat-horse-name {
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--cream);
+  line-height: 1.3;
+  margin-bottom: 0.1rem;
+}
+.cat-horse-coat {
+  font-family: var(--font-type);
+  font-size: 0.62rem;
+  color: var(--dust);
+}
+/* Ukryj opisy */
+.cat-horse-desc { display: none !important; }
+
+.cat-horse-badge {
+  position: absolute; top: 0.4rem; right: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  background: rgba(122,74,191,0.7);
+  border: 1px solid #b07ae8;
+  color: #d4b0ff;
+  font-family: var(--font-head);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* Responsive */
+@media(max-width: 768px) {
+  .cat-horses-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    padding: 1rem;
+  }
 }
