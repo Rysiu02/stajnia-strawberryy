@@ -135,21 +135,18 @@ function currentMonth() { return new Date().toISOString().slice(0,7); }
 
 /* Rozliczenia tygodniowe — zwraca string "RRRR-Wnn" np. "2025-W18" (ISO 8601) */
 function currentWeek() {
-  const now     = new Date();
-  const jan4    = new Date(now.getFullYear(), 0, 4);
-  const monday1 = new Date(jan4);
-  monday1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-  const diff    = now - monday1;
-  const week    = Math.floor(diff / (7 * 86400000)) + 1;
-  // Jeśli tydzień wychodzi poza rok — bierz z następnego roku
-  if (week < 1) {
-    const jan4prev = new Date(now.getFullYear() - 1, 0, 4);
-    const mon1prev = new Date(jan4prev);
-    mon1prev.setDate(jan4prev.getDate() - ((jan4prev.getDay() + 6) % 7));
-    const w = Math.floor((now - mon1prev) / (7 * 86400000)) + 1;
-    return (now.getFullYear() - 1) + '-W' + String(w).padStart(2, '0');
-  }
-  return now.getFullYear() + '-W' + String(week).padStart(2, '0');
+  return dateToWeek({ toDate: () => new Date() });
+}
+
+/* Zamień timestamp Firestore lub Date na "RRRR-Wnn" (ISO 8601) */
+function dateToWeek(ts) {
+  if (!ts) return null;
+  const d    = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date());
+  const tmp  = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay() || 7));
+  const jan1 = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((tmp - jan1) / 86400000) + 1) / 7);
+  return tmp.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
 }
 
 /* Etykieta tygodnia np. "Tydzień 18 (28 kwi – 4 maj 2025)" */
@@ -318,14 +315,8 @@ async function loadDashboard() {
     rSnap.forEach(d => {
       const r = d.data();
       /* Dla nowych rachunków sprawdź pole week, dla starych wylicz z daty */
-      let rWeek = r.week;
-      if (!rWeek && r.createdAt?.toDate) {
-        const date = r.createdAt.toDate();
-        const jan1 = new Date(date.getFullYear(), 0, 1);
-        const wNum = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-        rWeek = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
-      }
-      if (rWeek !== week) return; // pokaż tylko bieżący tydzień
+      const rWeek = r.week || dateToWeek(r.createdAt);
+      if (rWeek !== week) return;
       totalSales   += r.total      || 0;
       totalStable  += r.stable     || 0;
       totalWorkers += r.workerCut  || 0;
@@ -752,19 +743,7 @@ async function loadPayroll() {
 
     rSnap.forEach(d => {
       const r = d.data();
-      /* Użyj pola week jeśli istnieje, wpp wylicz z daty lub użyj miesiąca jako fallback */
-      let key;
-      if (r.week) {
-        key = r.week;
-      } else if (r.createdAt?.toDate) {
-        // Wylicz tydzień z daty zapisu
-        const date  = r.createdAt.toDate();
-        const jan1  = new Date(date.getFullYear(), 0, 1);
-        const wNum  = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-        key = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
-      } else {
-        key = r.month || '—';
-      }
+      const key = r.week || dateToWeek(r.createdAt) || r.month || '—';
 
       if (!weekMap[key]) weekMap[key] = {};
       if (!weekMap[key][r.workerUid]) weekMap[key][r.workerUid] = { name: r.workerName||'—', workerCut:0, paid:0 };
@@ -856,38 +835,23 @@ window.payWorker = async function(uid, name, weekKey, amount) {
 window.loadTax = async function() {
   const selWeek = document.getElementById('tax-filter-week')?.value || currentWeek();
 
-  /* Pokaż etykietę wybranego tygodnia */
   const lbl = document.getElementById('tax-week-label');
   if (lbl) lbl.textContent = weekLabel(selWeek);
 
   try {
-    /* Przychód — suma rachunków z wybranego tygodnia */
     const rSnap = await getDocs(collection(db,'receipts'));
     let income = 0;
     rSnap.forEach(d => {
-      const r = d.data();
-      let rWeek = r.week;
-      if (!rWeek && r.createdAt?.toDate) {
-        const date = r.createdAt.toDate();
-        const jan1 = new Date(date.getFullYear(), 0, 1);
-        const wNum = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-        rWeek = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
-      }
+      const r     = d.data();
+      const rWeek = r.week || dateToWeek(r.createdAt);
       if (rWeek === selWeek) income += r.total || 0;
     });
 
-    /* Wydatki z wybranego tygodnia */
     const eSnap = await getDocs(collection(db,'expenses'));
     let expenses = 0;
     eSnap.forEach(d => {
-      const e = d.data();
-      let eWeek = e.week;
-      if (!eWeek && e.createdAt?.toDate) {
-        const date = e.createdAt.toDate();
-        const jan1 = new Date(date.getFullYear(), 0, 1);
-        const wNum = Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-        eWeek = date.getFullYear() + '-W' + String(wNum).padStart(2,'0');
-      }
+      const e     = d.data();
+      const eWeek = e.week || dateToWeek(e.createdAt);
       if (eWeek === selWeek) expenses += e.amount || 0;
     });
 

@@ -1103,3 +1103,50 @@ main {
   from { opacity:0; transform:scale(0.95) translateY(-10px); }
   to   { opacity:1; transform:scale(1)    translateY(0);     }
 }
+
+/* =====================================================
+   STOPKA — Jack Miller
+   ===================================================== */
+#site-footer {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.5rem;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  background: linear-gradient(135deg, rgba(46,26,14,0.92), rgba(16,10,2,0.95));
+  border: 1px solid rgba(196,122,43,0.35);
+  box-shadow:
+    0 0 0 1px rgba(196,122,43,0.1),
+    0 4px 20px rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.footer-name {
+  font-family: var(--font-head);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--dust);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.footer-ornament {
+  font-size: 0.5rem;
+  color: var(--amber);
+  opacity: 0.7;
+}
+
+/* Schowaj stopkę gdy strona logowania jest widoczna */
+#login-screen:not(.hidden) ~ #site-footer,
+#loading-overlay:not(.hidden) ~ #site-footer {
+  display: none;
+}
