@@ -110,14 +110,26 @@ async function loadUserProfile(uid) {
   try {
     const snap = await getDoc(doc(db, 'users', uid));
     if (snap.exists()) {
+      /* Profil już istnieje (stworzony przez właściciela lub przy poprzednim logowaniu) */
       currentProfile = snap.data();
       currentRole    = currentProfile.role || 'viewer';
     } else {
-      currentProfile = { displayName: currentUser.email, email: currentUser.email, role: 'viewer' };
-      await setDoc(doc(db, 'users', uid), { ...currentProfile, createdAt: serverTimestamp() });
+      /* Brak profilu — pierwszy raz loguje się bez zaproszenia, daj viewer */
+      currentProfile = {
+        displayName: currentUser.displayName || currentUser.email.split('@')[0],
+        email:       currentUser.email,
+        role:        'viewer'
+      };
+      await setDoc(doc(db, 'users', uid), {
+        ...currentProfile,
+        createdAt: serverTimestamp()
+      });
       currentRole = 'viewer';
     }
-  } catch(e) { currentRole = 'viewer'; }
+  } catch(e) {
+    console.error('loadUserProfile:', e);
+    currentRole = 'viewer';
+  }
 }
 
 /* =====================================================
@@ -1102,36 +1114,74 @@ window.hireEmployee = async function() {
   const pass  = document.getElementById('hire-pass').value;
   const role  = document.getElementById('hire-role').value;
   const resultBox = document.getElementById('hire-result');
+
   if (!name||!email||!pass) { showToast('⚠ Wypełnij wszystkie pola'); return; }
-  if (pass.length<6) { showToast('⚠ Hasło min. 6 znaków'); return; }
+  if (pass.length < 6)      { showToast('⚠ Hasło min. 6 znaków'); return; }
+
   resultBox.style.display = 'none';
+  const btn = document.querySelector('#hire-panel .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Tworzę konto...'; }
+
   try {
+    /* Krok 1 — utwórz konto Auth przez REST API (nie dotyka sesji właściciela) */
     const apiKey = 'AIzaSyC-ONjc-zKqbq6_ojQyTu7rPWm7iK5aZro';
     const res    = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
-      { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ email, password: pass, returnSecureToken: true }) }
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, password: pass, returnSecureToken: false })
+        /* returnSecureToken: false — NIE zwracaj tokenu sesji, nie nadpisuj sesji właściciela */
+      }
     );
     const data = await res.json();
+
     if (data.error) {
-      const msgs = { 'EMAIL_EXISTS':'Ten e-mail jest już zajęty.','WEAK_PASSWORD':'Hasło za słabe.','INVALID_EMAIL':'Nieprawidłowy e-mail.' };
-      showToast('❌ ' + (msgs[data.error.message]||data.error.message)); return;
+      const msgs = {
+        'EMAIL_EXISTS':   'Ten e-mail jest już zajęty.',
+        'WEAK_PASSWORD':  'Hasło za słabe (min. 6 znaków).',
+        'INVALID_EMAIL':  'Nieprawidłowy adres e-mail.',
+      };
+      showToast('❌ ' + (msgs[data.error.message] || data.error.message));
+      return;
     }
-    await setDoc(doc(db,'users',data.localId), {
-      displayName: name, email, role,
-      createdAt: serverTimestamp(),
-      hiredBy: currentUser.uid
+
+    const newUid = data.localId;
+
+    /* Krok 2 — zapisz profil w Firestore z rolą wybraną przez właściciela */
+    await setDoc(doc(db, 'users', newUid), {
+      displayName: name,
+      email,
+      role,       /* rola ustawiona od razu — nie trzeba się logować */
+      createdAt:  serverTimestamp(),
+      hiredBy:    currentUser.uid,
+      hiredByName: currentProfile?.displayName || currentUser.email
     });
+
+    /* Krok 3 — wyczyść formularz i odśwież listę */
     document.getElementById('hire-name').value  = '';
     document.getElementById('hire-email').value = '';
     document.getElementById('hire-pass').value  = '';
+
     resultBox.style.display = 'block';
-    resultBox.innerHTML = `<div style="background:rgba(74,140,92,0.15);border:1px solid #4a8c5c;
-      padding:0.75rem 1rem;font-family:var(--font-type);font-size:0.8rem;color:#6abf7e">
-      ✓ Konto dla <strong>${name}</strong> (${email}) — Rola: <strong>${ROLES[role]?.label}</strong>
-    </div>`;
-    showToast('✓ ' + name + ' zatrudniony!'); loadAccounts();
-  } catch(e) { showToast('❌ '+e.message); }
+    resultBox.innerHTML = `
+      <div style="background:rgba(74,140,92,0.15);border:1px solid #4a8c5c;
+        padding:0.75rem 1rem;font-family:var(--font-type);font-size:0.8rem;color:#6abf7e;line-height:1.6">
+        ✓ Konto dla <strong>${name}</strong> zostało utworzone<br>
+        E-mail: ${email}<br>
+        Rola: <strong>${ROLES[role]?.label}</strong><br>
+        Pracownik może się teraz zalogować.
+      </div>`;
+
+    showToast('✓ ' + name + ' zatrudniony jako ' + ROLES[role]?.label + '!');
+    loadAccounts();
+
+  } catch(e) {
+    console.error('hireEmployee:', e);
+    showToast('❌ Błąd: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤝 Zatrudnij'; }
+  }
 };
 
 window.togglePassVisibility = function() {
