@@ -110,13 +110,13 @@ async function loadUserProfile(uid) {
   try {
     const snap = await getDoc(doc(db, 'users', uid));
     if (snap.exists()) {
-      /* Profil już istnieje (stworzony przez właściciela lub przy poprzednim logowaniu) */
       currentProfile = snap.data();
       currentRole    = currentProfile.role || 'viewer';
     } else {
-      /* Brak profilu — pierwszy raz loguje się bez zaproszenia, daj viewer */
+      /* Brak profilu w Firestore — ustaw imię z Firebase Auth lub z maila */
+      const authName = currentUser.displayName || null;
       currentProfile = {
-        displayName: currentUser.displayName || currentUser.email.split('@')[0],
+        displayName: authName || currentUser.email.split('@')[0],
         email:       currentUser.email,
         role:        'viewer'
       };
@@ -128,7 +128,22 @@ async function loadUserProfile(uid) {
     }
   } catch(e) {
     console.error('loadUserProfile:', e);
+    /* Nawet jeśli Firestore zawiedzie — pokaż przynajmniej imię z Firebase Auth */
+    currentProfile = {
+      displayName: currentUser.displayName || currentUser.email.split('@')[0],
+      email:       currentUser.email,
+      role:        'viewer'
+    };
     currentRole = 'viewer';
+
+    /* Spróbuj jeszcze raz bez reguł (własny profil zawsze dostępny) */
+    try {
+      const snap2 = await getDoc(doc(db, 'users', uid));
+      if (snap2.exists()) {
+        currentProfile = snap2.data();
+        currentRole    = currentProfile.role || 'viewer';
+      }
+    } catch(e2) { /* ignoruj */ }
   }
 }
 
