@@ -272,13 +272,17 @@ window.doLogin = async function() {
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Wejdź do Stajni';
     const msgs = {
-      'auth/invalid-email':      'Nieprawidłowy e-mail.',
-      'auth/user-not-found':     'Brak konta.',
-      'auth/wrong-password':     'Błędne hasło.',
-      'auth/invalid-credential': 'Błędne dane logowania.',
-      'auth/too-many-requests':  'Za dużo prób. Odczekaj.',
+      'auth/invalid-email':          'Nieprawidłowy adres e-mail.',
+      'auth/user-not-found':         'Nie znaleziono konta z tym adresem.',
+      'auth/wrong-password':         'Błędne hasło — spróbuj ponownie.',
+      'auth/invalid-credential':     'Błędne dane logowania.',
+      'auth/too-many-requests':      'Za dużo prób logowania — odczekaj chwilę.',
+      'auth/user-disabled':          'To konto zostało zablokowane.',
+      'auth/network-request-failed': 'Błąd sieci — sprawdź połączenie.',
+      'auth/missing-password':       'Podaj hasło.',
+      'auth/missing-email':          'Podaj adres e-mail.',
     };
-    showLoginErr(msgs[e.code] || e.message);
+    showLoginErr(msgs[e.code] || ('Błąd: ' + e.message));
   }
 };
 function showLoginErr(msg) {
@@ -1158,11 +1162,19 @@ window.hireEmployee = async function() {
 
     if (data.error) {
       const msgs = {
-        'EMAIL_EXISTS':   'Ten e-mail jest już zajęty.',
-        'WEAK_PASSWORD':  'Hasło za słabe (min. 6 znaków).',
-        'INVALID_EMAIL':  'Nieprawidłowy adres e-mail.',
+        'EMAIL_EXISTS':                   'Ten e-mail jest już zajęty — konto istnieje w systemie.',
+        'WEAK_PASSWORD : Password should be at least 6 characters': 'Hasło za słabe — minimum 6 znaków.',
+        'WEAK_PASSWORD':                  'Hasło za słabe — minimum 6 znaków.',
+        'INVALID_EMAIL':                  'Nieprawidłowy adres e-mail.',
+        'INVALID_LOGIN_CREDENTIALS':      'Błędne dane logowania.',
+        'TOO_MANY_ATTEMPTS_TRY_LATER':    'Za dużo prób — spróbuj za chwilę.',
+        'OPERATION_NOT_ALLOWED':          'Rejestracja emailem jest wyłączona w Firebase Console.',
+        'MISSING_PASSWORD':               'Podaj hasło dla nowego pracownika.',
+        'MISSING_EMAIL':                  'Podaj adres e-mail nowego pracownika.',
+        'QUOTA_EXCEEDED':                 'Przekroczono limit — spróbuj za chwilę.',
       };
-      showToast('❌ ' + (msgs[data.error.message] || data.error.message));
+      const errMsg = msgs[data.error.message] || ('Błąd: ' + data.error.message);
+      showToast('❌ ' + errMsg);
       return;
     }
 
