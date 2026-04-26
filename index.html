@@ -2,14 +2,14 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="version" content="1777210345"/>
+  <meta name="version" content="1777210343"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>🐎 Stajnia Strawberry</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐎</text></svg>"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css?v=1777222204"/>
+  <link rel="stylesheet" href="style.css?v=1777233112"/>
 </head>
 <body>
 
@@ -21,7 +21,85 @@
   <div class="loading-text">Siodłamy konie...</div>
 </div>
 
-<!-- LOGIN -->
+<!-- ══ STRONA PUBLICZNA ══ -->
+<div id="public-screen" class="hidden">
+
+  <!-- POZIOM 1: Strona startowa — jeden kafelek -->
+  <div id="start-screen" class="pub-level">
+    <div class="pub-brand">
+      <div class="pub-brand-icon">🐎</div>
+      <div class="pub-brand-name">Stajnia Strawberry</div>
+      <div class="pub-brand-sub">A.D. 1905</div>
+    </div>
+    <div class="pub-main-tile" onclick="showCatScreen()">
+      <div class="pub-tile-icon">🐎</div>
+      <div class="pub-tile-name">Katalog Koni</div>
+      <div class="pub-tile-desc">Przeglądaj dostępne rasy i umaszczenia</div>
+      <div class="pub-tile-arrow">→</div>
+    </div>
+  </div>
+
+  <!-- POZIOM 2: Kategorie koni -->
+  <div id="cat-screen" class="pub-level hidden">
+    <div class="pub-top-bar">
+      <button class="cat-back-btn" onclick="showStartScreen()">← Powrót</button>
+      <div>
+        <div class="pub-bar-title">Katalog Koni</div>
+        <div class="pub-bar-sub">Wybierz kategorię</div>
+      </div>
+      <div></div>
+    </div>
+    <div class="cat-categories-grid" id="cat-categories-grid"></div>
+  </div>
+
+  <!-- POZIOM 3: Lista koni w kategorii -->
+  <div id="horses-screen" class="pub-level hidden">
+    <div class="pub-top-bar">
+      <button class="cat-back-btn" onclick="backToCategories()">← Kategorie</button>
+      <div>
+        <div class="pub-bar-title" id="horses-screen-title">—</div>
+        <div class="pub-bar-sub" id="horses-screen-sub">—</div>
+      </div>
+      <div></div>
+    </div>
+    <div class="cat-horses-grid" id="cat-horses-grid"></div>
+  </div>
+
+  <!-- POZIOM 4: Szczegóły konia -->
+  <div id="horse-detail-screen" class="pub-level hidden">
+    <div class="pub-top-bar">
+      <button class="cat-back-btn" onclick="backToHorses()">← Lista</button>
+      <div class="pub-bar-title" id="detail-title">—</div>
+      <div></div>
+    </div>
+    <div class="horse-detail-body">
+      <div class="horse-detail-img-wrap">
+        <img id="detail-img" src="" alt=""/>
+      </div>
+      <div class="horse-detail-info">
+        <div class="horse-detail-category" id="detail-category">—</div>
+        <div class="horse-detail-name" id="detail-name">—</div>
+        <div class="horse-detail-coat" id="detail-coat">—</div>
+        <div class="horse-detail-divider">✦ opis ✦</div>
+        <div class="horse-detail-desc" id="detail-desc">—</div>
+        <button class="cat-back-btn" style="margin-top:1.5rem" onclick="backToHorses()">← Wróć do listy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stopka z sekretnym triggerem -->
+  <div class="pub-footer">
+    <span
+      id="secret-trigger"
+      onclick="onSecretTrigger()"
+      class="pub-footer-name">
+      ✦ Jack Miller ✦
+    </span>
+  </div>
+
+</div>
+
+<!-- ══ UKRYTY PANEL LOGOWANIA — trigger w stopce ══ -->
 <div id="login-screen" class="hidden">
   <div class="login-box">
     <div class="login-seal">🤠</div>
@@ -34,7 +112,8 @@
       <div id="login-error" class="login-error" style="display:none"></div>
       <button class="login-submit" id="login-btn" onclick="doLogin()">Wejdź do Stajni</button>
     </div>
-    <div class="login-footer">Nie masz konta? Skontaktuj się z właścicielem.</div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:0.5rem;font-size:0.7rem"
+      onclick="hideLoginPanel()">← Zamknij</button>
   </div>
 </div>
 
@@ -738,16 +817,10 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=1777222204"></script>
+<script type="module" src="app.js?v=1777233112"></script>
 
 <!-- STOPKA -->
-<div id="site-footer">
-  <div class="footer-inner">
-    <span class="footer-ornament">✦</span>
-    <span class="footer-name">Wykonał - Jack Miller</span>
-    <span class="footer-ornament">✦</span>
-  </div>
-</div>
+
 
 </body>
 </html>

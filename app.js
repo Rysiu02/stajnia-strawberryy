@@ -75,7 +75,7 @@ const CATALOG = [
   /* === PRODUKTY === */
   { id:'szczotka',    name:'Szczotka',                  cat:'Produkty', icon:'🪮',                  img:'img/szczotka.png',        price:7,    unit:'szt.' },
   { id:'kopystka',    name:'Kopystka',                  cat:'Produkty', icon:'🔧',                  img:'img/kopystka.png',        price:17,   unit:'szt.' },
-  { id:'ozwiezwiacz', name:'Otrzeźwiacz dla konia',     cat:'Produkty', icon:'💊',                  img:'img/otrzezwiacz.png',     price:31,   unit:'szt.' },
+  { id:'otrzezwiacz', name:'Otrzeźwiacz dla konia',     cat:'Produkty', icon:'💊',                  img:'img/otrzezwiacz.png',     price:31,   unit:'szt.' },
   { id:'masc',        name:'Maść dla konia',            cat:'Produkty', icon:'🧴',                  img:'img/masc.png',            price:21,   unit:'szt.' },
   { id:'siano',       name:'Siano',                     cat:'Produkty', icon:'🌾',                  img:'img/siano.png',           price:2,    unit:'kg'   },
   { id:'marchewka',   name:'Marchewka',                 cat:'Produkty', icon:'🥕',                  img:'img/marchew.png',         price:2,    unit:'szt.' },
@@ -196,18 +196,42 @@ function weekLabel(weekStr) {
    ===================================================== */
 function showLogin() {
   document.getElementById('loading-overlay').classList.add('hidden');
-  document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
-  // Zawsze resetuj przycisk i pola przy powrocie do logowania
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('public-screen').classList.remove('hidden');
+
+  // Reset przycisku i pól
   const btn = document.getElementById('login-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Wejdź do Stajni'; }
   const err = document.getElementById('login-error');
   if (err) err.style.display = 'none';
+
+  // Zawsze wróć do ekranu startowego
+  showAllLevelsHidden();
+  document.getElementById('start-screen').classList.remove('hidden');
 }
+
+function showAllLevelsHidden() {
+  ['start-screen','cat-screen','horses-screen','horse-detail-screen'].forEach(id => {
+    document.getElementById(id)?.classList.add('hidden');
+  });
+}
+
+window.showStartScreen = function() {
+  showAllLevelsHidden();
+  document.getElementById('start-screen').classList.remove('hidden');
+};
+
+window.showCatScreen = function() {
+  showAllLevelsHidden();
+  renderCatalogCategories();
+  document.getElementById('cat-screen').classList.remove('hidden');
+};
 
 function showApp() {
   document.getElementById('loading-overlay').classList.add('hidden');
   document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('public-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
 
   const badge = document.getElementById('user-badge');
@@ -291,9 +315,7 @@ function showLoginErr(msg) {
 }
 window.doLogout = async function() {
   await signOut(auth);
-  // Reset przycisku logowania — onAuthStateChanged wywoła showLogin()
-  const btn = document.getElementById('login-btn');
-  if (btn) { btn.disabled = false; btn.textContent = 'Wejdź do Stajni'; }
+  // onAuthStateChanged wywoła showLogin() → public-screen
 };
 
 /* =====================================================
@@ -518,7 +540,7 @@ window.addToBasket = function(itemId) {
     }
     existing.qty++;
   } else {
-    basket.push({ id: itemId, name: item.name, icon: item.icon, price: item.price, qty: 1, isHorse: false });
+    basket.push({ id: itemId, name: item.name, icon: item.icon, img: item.img || null, price: item.price, qty: 1, isHorse: false });
   }
   renderBasket();
 };
@@ -532,7 +554,13 @@ function renderBasket() {
   }
   el.innerHTML = basket.map((item, idx) => `
     <div class="basket-row">
-      <span class="basket-icon">${item.icon}</span>
+      <div class="basket-icon">
+        ${item.img
+          ? `<img src="${item.img}" class="basket-item-img" alt="${item.name}"
+               onerror="this.style.display='none';this.nextSibling.style.display='inline'"/>
+             <span style="display:none;font-size:1.2rem">${item.icon}</span>`
+          : `<span style="font-size:1.2rem">${item.icon}</span>`}
+      </div>
       <span class="basket-name">${item.name}</span>
       <div class="basket-qty-ctrl">
         ${!item.isHorse ? `<button onclick="changeQty(${idx},-1)">−</button>` : ''}
@@ -594,6 +622,7 @@ window.saveReceipt = async function() {
   const total  = lines.reduce((s,l) => s+l.subtotal, 0);
   const half   = total / 2;
   const month  = currentMonth();
+  const week   = currentWeek();
   const client = document.getElementById('rec-client').value.trim();
   const note   = document.getElementById('rec-note').value.trim();
 
@@ -632,7 +661,8 @@ window.saveReceipt = async function() {
     loadDashboard();
     loadReceiptsHistory();
     loadWarehouse();
-    buildCatalogTiles(); // odśwież kafelki po zmianie stanu
+    loadPayroll();        // odśwież wypłaty — nowy rachunek wpływa na zakładki
+    buildCatalogTiles();  // odśwież kafelki po zmianie stanu
   } catch(e) {
     console.error('saveReceipt:', e);
     showToast('❌ ' + e.message);
@@ -1358,4 +1388,148 @@ window.showToast = function(msg) {
 
 document.addEventListener('keydown', e => {
   if (e.key==='Enter' && !document.getElementById('login-screen').classList.contains('hidden')) doLogin();
+  if (e.key==='Escape') {
+    const overlay = document.getElementById('catalog-overlay');
+    if (overlay && !overlay.classList.contains('hidden')) closeCatalogOverlay();
+  }
+});
+
+
+/* =====================================================
+   KATALOG KONI — overlay na ekranie logowania
+   ===================================================== */
+
+/* =====================================================
+   SEKRETNY TRIGGER LOGOWANIA — klik w "Jack Miller"
+   ===================================================== */
+let _secretClickCount = 0;
+let _secretTimer      = null;
+
+window.onSecretTrigger = function() {
+  /* Wymagane pojedyncze kliknięcie — panel pojawia się od razu */
+  showLoginPanel();
+};
+
+function showLoginPanel() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-email').focus();
+}
+
+window.hideLoginPanel = function() {
+  document.getElementById('login-screen').classList.add('hidden');
+  const btn = document.getElementById('login-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Wejdź do Stajni'; }
+  const err = document.getElementById('login-error');
+  if (err) err.style.display = 'none';
+};
+
+const HORSE_CATALOG = {
+  muly: {
+    label: 'Muły',
+    icon:  '🐴',
+    desc:  'Muły to skrzyżowanie konia i osła — wytrzymałe, spokojne i niezawodne w trudnym terenie.',
+    konie: [
+      { id:'ambercreamchampageneleopard', name:'Amber Cream Champagne Leopard', coat:'Bursztynowy Kremowy Szampan Leopard', img:'konie/muly/ambercreamchampageneleopard.png', desc:'Wyjątkowe umaszczenie łączące kremowy odcień szampana z ciemnymi cętkami rozmieszczonymi na całym ciele.' },
+      { id:'blackblanket',               name:'Black Blanket',                  coat:'Czarny Koc',                          img:'konie/muly/blackblanket.png',               desc:'Ciemnoszara maść z charakterystycznym jasnym kocem na zadzie, kontrastującym z ciemnym przodem.' },
+      { id:'blackfewspotted',            name:'Black Few Spotted',              coat:'Czarny Nieliczne Cętki',              img:'konie/muly/blackfewspotted.png',            desc:'Prawie całkowicie biały z nielicznymi czarnymi plamami — rzadkie i charakterystyczne umaszczenie.' },
+      { id:'blackleopard',               name:'Black Leopard',                  coat:'Czarny Leopard',                      img:'konie/muly/blackleopard.png',               desc:'Białe tło pokryte wyraźnymi czarnymi cętkami — jedno z najbardziej rozpoznawalnych umaszczeni.' },
+      { id:'chestnut',                   name:'Chestnut',                       coat:'Kasztanowaty',                        img:'konie/muly/chestnut.png',                   desc:'Klasyczna kasztanowata maść — ciepły, złotobrązowy odcień sierści z ciemniejszą grzywą.' },
+      { id:'classicchampagneblanket',    name:'Classic Champagne Blanket',      coat:'Klasyczny Szampan Koc',               img:'konie/muly/classicchampagneblanket.png',    desc:'Szampańska maść z białym kocem na zadzie i delikatnymi cętkami — elegancka kombinacja.' },
+      { id:'goldchampagnetobiano',       name:'Gold Champagne Tobiano',         coat:'Złoty Szampan Tobiano',               img:'konie/muly/goldchampagnetobiano.png',       desc:'Złocisto-szampański odcień z białymi plamami tobiano — ciepłe i luksusowe umaszczenie.' },
+      { id:'greynearleopard',            name:'Grey Near Leopard',              coat:'Szary Prawie Leopard',                img:'konie/muly/greynearleopard.png',            desc:'Jasne, popielate tło z delikatnymi brązowymi cętkami — subtelna odmiana umaszczenia leopard.' },
+      { id:'mealybay',                   name:'Mealy Bay',                      coat:'Karoszy Mączysty',                    img:'konie/muly/mealybay.png',                   desc:'Kasztanowato-gniade umaszczenie z charakterystycznym jaśniejszym podbrzuszem.' },
+      { id:'pangarebaybrindle',          name:'Pangare Bay Brindle',            coat:'Pangare Gniadobrązowy Prążkowany',    img:'konie/muly/pangarebaybrindle.png',          desc:'Wyjątkowe prążkowane umaszczenie z ciemnymi pasami na gniadobrązowym tle — ekstremalnie rzadkie.' },
+      { id:'redblanket',                 name:'Red Blanket',                    coat:'Czerwony Koc',                        img:'konie/muly/redblanket.png',                 desc:'Rudo-kasztanowe umaszczenie z jaśniejszym kocem na zadzie i białymi skarpetkami.' },
+      { id:'redleopard',                 name:'Red Leopard',                    coat:'Czerwony Leopard',                    img:'konie/muly/redleopard.png',                 desc:'Białe tło z rudymi cętkami — ciepłe i charakterystyczne umaszczenie leopard.' },
+      { id:'sealbay',                    name:'Seal Bay',                       coat:'Ciemnokaroszy',                       img:'konie/muly/sealbay.png',                    desc:'Bardzo ciemna, prawie czarna maść z gniadymi refleksami — elegancka i poważna.' },
+      { id:'silverbaypangare',           name:'Silver Bay Pangare',             coat:'Srebrny Gniadokaroszy Pangare',       img:'konie/muly/silverbaypangare.png',           desc:'Srebrzysty odcień gniady z pangare — biała grzywa kontrastuje z ciemnymi kończynami.' },
+      { id:'silverblackblanket',         name:'Silver Black Blanket',           coat:'Srebrno-Czarny Koc',                  img:'konie/muly/silverblackblanket.png',         desc:'Ciemny z srebrnym połyskiem i charakterystycznym białym kocem na zadzie.' },
+      { id:'smokyblackblanket',          name:'Smoky Black Blanket',            coat:'Dymno-Czarny Koc',                    img:'konie/muly/smokyblackblanket.png',          desc:'Dymno-brązowe umaszczenie z białym kocem na zadzie i białymi skarpetkami.' },
+      { id:'sootybayleopard',            name:'Sooty Bay Leopard',              coat:'Brudnokaroszy Leopard',               img:'konie/muly/sootybayleopard.png',            desc:'Pomarańczowo-gniade tło z ciemnymi cętkami — intensywne i przyciągające wzrok umaszczenie.' },
+      { id:'whitelegendary',             name:'White — Legendarny',             coat:'Biały Legendarny',                    img:'konie/muly/whitelegendary.png',             desc:'Czysto biała maść — legendarny okaz stajni Strawberry. Wyjątkowy i niepowtarzalny.', legendary:true },
+      { id:'zonkey',                     name:'Zonkey',                         coat:'Zebrowiec (Muł × Zebra)',             img:'konie/muly/zonkey.png',                     desc:'Niezwykłe skrzyżowanie muła i zebry — charakterystyczne paski na pomarańczowo-brązowym tle. Prawdziwa osobliwość!', legendary:true },
+    ]
+  }
+  /* Kolejne kategorie dodaj tutaj w tym samym formacie */
+};
+
+let _currentCatId = null;
+
+window.openCatalogOverlay = function() {
+  /* Nie potrzeba — katalog jest już na public-screen */
+};
+window.closeCatalogOverlay = function() {
+  /* Nie potrzeba — katalog jest już na public-screen */
+};
+
+function renderCatalogCategories() {
+  const grid = document.getElementById('cat-categories-grid');
+  if (!grid) return;
+  grid.innerHTML = Object.entries(HORSE_CATALOG).map(([id, cat]) => `
+    <div class="cat-category-card" onclick="openCatalogCategory('${id}')">
+      <div class="cat-cat-icon">${cat.icon}</div>
+      <div class="cat-cat-name">${cat.label}</div>
+      <div class="cat-cat-count">${cat.konie.length} umaszczeni</div>
+    </div>`).join('');
+}
+
+window.openCatalogCategory = function(catId) {
+  _currentCatId = catId;
+  const cat = HORSE_CATALOG[catId];
+  if (!cat) return;
+
+  showAllLevelsHidden();
+  document.getElementById('horses-screen').classList.remove('hidden');
+
+  document.getElementById('horses-screen-title').textContent = cat.icon + ' ' + cat.label;
+  const sub = document.getElementById('horses-screen-sub');
+  if (sub) sub.textContent = cat.desc;
+
+  const grid = document.getElementById('cat-horses-grid');
+  grid.innerHTML = cat.konie.map(h => `
+    <div class="cat-horse-card ${h.legendary ? 'legendary' : ''}"
+      onclick="openHorseDetail('${catId}','${h.id}')">
+      ${h.legendary ? '<div class="cat-horse-badge">⭐ Legendarny</div>' : ''}
+      <img class="cat-horse-img" src="${h.img}" alt="${h.name}" loading="lazy"/>
+      <div class="cat-horse-body">
+        <div class="cat-horse-name">${h.name}</div>
+        <div class="cat-horse-coat">${h.coat}</div>
+      </div>
+    </div>`).join('');
+};
+
+window.openHorseDetail = function(catId, horseId) {
+  const cat   = HORSE_CATALOG[catId];
+  const horse = cat?.konie.find(h => h.id === horseId);
+  if (!horse) return;
+
+  showAllLevelsHidden();
+  document.getElementById('horse-detail-screen').classList.remove('hidden');
+
+  document.getElementById('detail-img').src          = horse.img;
+  document.getElementById('detail-title').textContent = horse.name;
+  document.getElementById('detail-category').textContent = cat.label;
+  document.getElementById('detail-name').textContent  = horse.name;
+  document.getElementById('detail-coat').textContent  = horse.coat;
+  document.getElementById('detail-desc').textContent  = horse.desc;
+};
+
+window.backToCategories = function() {
+  showAllLevelsHidden();
+  renderCatalogCategories();
+  document.getElementById('cat-screen').classList.remove('hidden');
+};
+
+window.backToHorses = function() {
+  if (_currentCatId) openCatalogCategory(_currentCatId);
+};
+
+/* ESC zamyka overlay */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('catalog-overlay');
+    if (overlay && !overlay.classList.contains('hidden')) {
+      closeCatalogOverlay();
+    }
+  }
 });

@@ -1174,3 +1174,441 @@ main {
 .catalog-tile:has(.catalog-tile-img) {
   padding: 0.75rem 0.5rem 0.75rem;
 }
+
+
+
+/* =====================================================
+   PUBLIC SCREEN — katalog koni (strona główna)
+   ===================================================== */
+#public-screen {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 30%, #1e0e02 0%, transparent 70%),
+    linear-gradient(180deg, #120900 0%, #0d0800 100%);
+  overflow: hidden;
+}
+#public-screen.hidden { display: none; }
+
+/* Nagłówek publiczny */
+.public-header {
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  padding: 0 2rem 2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+.public-title {
+  font-family: var(--font-title);
+  font-size: clamp(1.1rem, 3vw, 1.7rem);
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(196,122,43,0.4);
+}
+.public-sub {
+  font-family: var(--font-type);
+  font-size: 0.68rem;
+  color: var(--dust);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-top: 0.2rem;
+}
+.public-ornament {
+  font-size: 0.9rem;
+  color: var(--amber);
+  letter-spacing: 0.5em;
+  opacity: 0.5;
+}
+
+/* Intro tekst */
+.cat-intro {
+  padding: 1rem 2rem 0;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: rgba(200,176,128,0.5);
+}
+
+/* Breadcrumb nawigacja */
+.cat-breadcrumb {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.85rem 2rem;
+  border-bottom: 1px solid rgba(196,122,43,0.12);
+  background: rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+.cat-breadcrumb-sep {
+  color: var(--amber); opacity: 0.5; font-size: 1rem;
+}
+.cat-breadcrumb-cur {
+  font-family: var(--font-head);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--pale-gold);
+  letter-spacing: 0.08em;
+}
+
+/* Panel logowania — nakładka nad public-screen */
+#login-screen {
+  position: fixed; inset: 0; z-index: 800;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+#login-screen.hidden { display: none !important; }
+
+
+
+/* =====================================================
+   PUBLIC SCREEN — strona publiczna
+   ===================================================== */
+#public-screen {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 20%, #221005 0%, transparent 70%),
+    linear-gradient(180deg, #0d0800 0%, #100900 100%);
+}
+#public-screen.hidden { display: none; }
+
+/* Poziomy nawigacji */
+.pub-level {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pub-level.hidden { display: none !important; }
+
+/* ── START SCREEN — jeden kafelek ── */
+#start-screen {
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+}
+
+.pub-brand {
+  text-align: center;
+}
+.pub-brand-icon {
+  font-size: 3.5rem;
+  filter: drop-shadow(0 0 12px rgba(196,122,43,0.6));
+  margin-bottom: 0.5rem;
+  animation: sealPulse 3s ease-in-out infinite;
+}
+.pub-brand-name {
+  font-family: var(--font-title);
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(196,122,43,0.4);
+  letter-spacing: 0.05em;
+}
+.pub-brand-sub {
+  font-family: var(--font-type);
+  font-size: 0.75rem;
+  color: var(--dust);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-top: 0.3rem;
+  opacity: 0.7;
+}
+
+/* Główny kafelek katalogu */
+.pub-main-tile {
+  position: relative;
+  width: min(320px, 85vw);
+  padding: 2.5rem 2rem;
+  border: 1px solid rgba(196,122,43,0.4);
+  background: linear-gradient(160deg, rgba(46,26,14,0.9), rgba(16,10,2,0.95));
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow:
+    0 0 0 1px rgba(196,122,43,0.1),
+    0 8px 32px rgba(0,0,0,0.6);
+}
+.pub-main-tile::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amber), var(--pale-gold), var(--amber), transparent);
+  opacity: 0; transition: opacity 0.3s;
+}
+.pub-main-tile:hover {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px rgba(196,122,43,0.3), 0 12px 40px rgba(0,0,0,0.7), 0 0 30px rgba(196,122,43,0.15);
+  transform: translateY(-4px);
+}
+.pub-main-tile:hover::before { opacity: 1; }
+.pub-tile-icon {
+  font-size: 3.5rem;
+  margin-bottom: 0.75rem;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+  transition: transform 0.3s;
+}
+.pub-main-tile:hover .pub-tile-icon { transform: scale(1.1); }
+.pub-tile-name {
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  color: var(--gold);
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+.pub-tile-desc {
+  font-family: var(--font-type);
+  font-size: 0.75rem;
+  color: var(--dust);
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+.pub-tile-arrow {
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  color: var(--amber);
+  opacity: 0.6;
+  transition: all 0.3s;
+}
+.pub-main-tile:hover .pub-tile-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* Stopka z sekretnym triggerem */
+.pub-footer {
+  padding: 1rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+.pub-footer-name {
+  font-family: var(--font-type);
+  font-size: 0.72rem;
+  color: rgba(200,176,128,0.25);
+  letter-spacing: 0.2em;
+  cursor: default;
+  user-select: none;
+  transition: color 0.2s;
+  padding: 0.5rem 1rem;
+  display: inline-block;
+}
+.pub-footer-name:hover {
+  color: rgba(200,176,128,0.4);
+}
+
+/* ── TOP BAR — nawigacja kategorii/listy ── */
+.pub-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid rgba(196,122,43,0.2);
+  background: rgba(0,0,0,0.25);
+  flex-shrink: 0;
+  gap: 1rem;
+}
+.pub-bar-title {
+  font-family: var(--font-title);
+  font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+  color: var(--gold);
+  text-align: center;
+}
+.pub-bar-sub {
+  font-family: var(--font-type);
+  font-size: 0.65rem;
+  color: var(--dust);
+  letter-spacing: 0.15em;
+  text-align: center;
+  margin-top: 0.1rem;
+  opacity: 0.7;
+}
+
+/* ── SIATKA KATEGORII ── */
+.cat-categories-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  overflow-y: auto;
+  flex: 1;
+  align-content: center;
+}
+.cat-category-card {
+  width: 220px;
+  padding: 2rem 1.25rem 1.75rem;
+  border: 1px solid rgba(196,122,43,0.25);
+  background: linear-gradient(160deg, rgba(46,26,14,0.85), rgba(16,10,2,0.95));
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.25s ease;
+  position: relative; overflow: hidden;
+}
+.cat-category-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  opacity: 0; transition: opacity 0.25s;
+}
+.cat-category-card:hover {
+  border-color: var(--amber);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.5), 0 0 20px rgba(196,122,43,0.12);
+}
+.cat-category-card:hover::before { opacity: 1; }
+.cat-cat-icon { font-size: 3rem; margin-bottom: 0.65rem; line-height: 1; }
+.cat-cat-name {
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  color: var(--gold);
+  margin-bottom: 0.3rem;
+}
+.cat-cat-count {
+  font-family: var(--font-type);
+  font-size: 0.68rem;
+  color: var(--dust);
+  letter-spacing: 0.12em;
+  opacity: 0.7;
+}
+
+/* ── SIATKA KONI ── */
+.cat-horses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 1rem;
+  padding: 1.25rem 2rem 2rem;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
+}
+.cat-horse-card {
+  border: 1px solid rgba(196,122,43,0.2);
+  background: linear-gradient(160deg, rgba(30,16,5,0.9), rgba(10,6,1,0.95));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  position: relative;
+}
+.cat-horse-card:hover {
+  border-color: var(--amber);
+  box-shadow: 0 0 15px rgba(196,122,43,0.2);
+  transform: translateY(-2px);
+}
+.cat-horse-card.legendary { border-color: rgba(180,130,255,0.4); }
+.cat-horse-card.legendary:hover { border-color: #b07ae8; box-shadow: 0 0 15px rgba(122,74,191,0.25); }
+.cat-horse-img {
+  width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+  transition: transform 0.3s ease;
+}
+.cat-horse-card:hover .cat-horse-img { transform: scale(1.05); }
+.cat-horse-body {
+  padding: 0.6rem 0.75rem 0.7rem;
+  border-top: 1px solid rgba(196,122,43,0.1);
+}
+.cat-horse-name {
+  font-family: var(--font-head); font-size: 0.72rem; font-weight: 700;
+  color: var(--cream); line-height: 1.3; margin-bottom: 0.15rem;
+}
+.cat-horse-coat { font-family: var(--font-type); font-size: 0.62rem; color: var(--dust); }
+.cat-horse-badge {
+  position: absolute; top: 0.4rem; right: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  background: rgba(122,74,191,0.7); border: 1px solid #b07ae8; color: #d4b0ff;
+  font-family: var(--font-head); font-size: 0.55rem; font-weight: 700; letter-spacing: 0.08em;
+}
+
+/* ── SZCZEGÓŁY KONIA ── */
+.horse-detail-body {
+  display: grid; grid-template-columns: 1fr 1fr;
+  flex: 1; overflow: hidden;
+}
+.horse-detail-img-wrap { overflow: hidden; background: rgba(0,0,0,0.4); }
+.horse-detail-img-wrap img {
+  width: 100%; height: 100%; object-fit: cover;
+  filter: brightness(1.05) contrast(1.05);
+}
+.horse-detail-info {
+  padding: 2rem; overflow-y: auto;
+  border-left: 1px solid rgba(196,122,43,0.2);
+  display: flex; flex-direction: column;
+}
+.horse-detail-category {
+  font-family: var(--font-type); font-size: 0.65rem;
+  letter-spacing: 0.3em; color: var(--amber); text-transform: uppercase; margin-bottom: 0.4rem;
+}
+.horse-detail-name {
+  font-family: var(--font-title); font-size: clamp(1rem, 2.5vw, 1.5rem);
+  color: var(--gold); line-height: 1.2; margin-bottom: 0.4rem;
+  text-shadow: 0 0 15px rgba(196,122,43,0.3);
+}
+.horse-detail-coat {
+  font-family: var(--font-body); font-style: italic; color: var(--dust); font-size: 0.9rem;
+  margin-bottom: 1.25rem; padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(196,122,43,0.2);
+}
+.horse-detail-divider {
+  display: flex; align-items: center; gap: 0.5rem;
+  color: var(--amber); font-size: 0.65rem; margin-bottom: 1rem;
+  font-family: var(--font-type); letter-spacing: 0.15em;
+}
+.horse-detail-divider::before, .horse-detail-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--amber); opacity: 0.3;
+}
+.horse-detail-desc {
+  font-family: var(--font-type); font-size: 0.82rem;
+  color: rgba(200,176,128,0.8); line-height: 1.8;
+}
+
+/* ── PANEL LOGOWANIA — nakładka ── */
+#login-screen {
+  position: fixed; inset: 0; z-index: 800;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+#login-screen.hidden { display: none !important; }
+
+/* Przyciski nawigacji */
+.cat-back-btn {
+  padding: 0.4rem 1rem;
+  border: 1px solid rgba(196,122,43,0.3);
+  background: transparent; color: var(--dust);
+  font-family: var(--font-head); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.1em; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.cat-back-btn:hover { border-color: var(--amber); color: var(--gold); }
+
+/* Responsive */
+@media(max-width: 768px) {
+  .horse-detail-body { grid-template-columns: 1fr; grid-template-rows: 240px 1fr; }
+  .horse-detail-img-wrap { height: 240px; }
+  .horse-detail-info { border-left: none; border-top: 1px solid rgba(196,122,43,0.2); padding: 1.25rem; }
+  .cat-horses-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); padding: 1rem; }
+  .pub-top-bar { padding: 0.75rem 1rem; }
+}
+
+/* Stopka w APP (Jack Miller gdy zalogowany) */
+#site-footer {
+  position: fixed; bottom: 1rem; right: 1.25rem; z-index: 100;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  background: rgba(16,10,2,0.9);
+  border: 1px solid rgba(196,122,43,0.3);
+  pointer-events: none;
+}
+.footer-name {
+  font-family: var(--font-head); font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.2em; color: var(--dust); text-transform: uppercase;
+}
+.footer-ornament { font-size: 0.45rem; color: var(--amber); opacity: 0.7; }
+
+/* Obrazek produktu w koszyku rachunku */
+.basket-item-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+}
