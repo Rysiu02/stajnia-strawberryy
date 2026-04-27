@@ -95,13 +95,27 @@ let movingItemId   = null;
 /* =====================================================
    AUTH
    ===================================================== */
+/* Awaryjny timeout — gdyby Firebase w ogóle nie odpowiedział */
+const _loadingTimeout = setTimeout(() => {
+  if (!document.getElementById('loading-overlay').classList.contains('hidden')) {
+    console.warn('Auth timeout — wymuszam ekran logowania');
+    showLogin();
+  }
+}, 8000);
+
 onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    currentUser = user;
-    await loadUserProfile(user.uid);
-    showApp();
-  } else {
-    currentUser = currentProfile = currentRole = null;
+  clearTimeout(_loadingTimeout);
+  try {
+    if (user) {
+      currentUser = user;
+      await loadUserProfile(user.uid);
+      showApp();
+    } else {
+      currentUser = currentProfile = currentRole = null;
+      showLogin();
+    }
+  } catch(e) {
+    console.error('Auth flow error:', e);
     showLogin();
   }
 });
@@ -199,37 +213,16 @@ function showLogin() {
   document.getElementById('app').classList.add('hidden');
   document.getElementById('public-screen').classList.remove('hidden');
 
+
   // Reset przycisku i pól
   const btn = document.getElementById('login-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Wejdź do Stajni'; }
   const err = document.getElementById('login-error');
   if (err) err.style.display = 'none';
-
-  // Zawsze wróć do ekranu startowego
-  showAllLevelsHidden();
-  document.getElementById('start-screen').classList.remove('hidden');
 }
-
-function showAllLevelsHidden() {
-  ['start-screen','cat-screen','horses-screen','horse-detail-screen'].forEach(id => {
-    document.getElementById(id)?.classList.add('hidden');
-  });
-}
-
-window.showStartScreen = function() {
-  showAllLevelsHidden();
-  document.getElementById('start-screen').classList.remove('hidden');
-};
-
-window.showCatScreen = function() {
-  showAllLevelsHidden();
-  renderCatalogCategories();
-  document.getElementById('cat-screen').classList.remove('hidden');
-};
 
 function showApp() {
   document.getElementById('loading-overlay').classList.add('hidden');
-  document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('public-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
 
@@ -820,18 +813,77 @@ window.loadReceiptsHistory = async function() {
       return;
     }
     tbody.innerHTML = rows.map(r => `
-      <tr>
+      <tr onclick="openReceiptModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">
         <td class="muted">${fmtD(r.createdAt)}</td>
         <td>${r.client||'—'}</td>
         <td>${r.workerName||'—'}</td>
         <td style="font-size:0.75rem;color:var(--dust)">${(r.lines||[]).map(l=>`${l.name} ×${l.qty}`).join(', ')}</td>
+        <td style="font-size:0.75rem;color:var(--dust);font-style:italic">${r.note||'—'}</td>
         <td><strong style="color:var(--pale-gold)">${fmt(r.total)}</strong></td>
         <td style="color:var(--amber)">${fmt(r.stable)}</td>
         <td style="color:#6abf7e">${fmt(r.workerCut)}</td>
-        <td>${isOwnerLevel() ? `<button class="btn btn-danger" style="padding:0.2rem 0.4rem;font-size:0.65rem"
+        <td onclick="event.stopPropagation()">${isOwnerLevel() ? `<button class="btn btn-danger" style="padding:0.2rem 0.4rem;font-size:0.65rem"
           onclick="deleteReceipt('${r._id}')">Usuń</button>` : ''}</td>
       </tr>`).join('');
   } catch(e) { console.error('Receipts history:', e); showToast('❌ Błąd ładowania rachunków'); }
+};
+
+/* =====================================================
+   MODAL PARAGONU
+   ===================================================== */
+const CATALOG_ICONS = Object.fromEntries(CATALOG.map(c => [c.id, c.icon]));
+
+window.openReceiptModal = function(r) {
+  /* meta */
+  document.getElementById('par-date').textContent   = fmtD(r.createdAt) || '—';
+  document.getElementById('par-client').textContent = r.client  || '— brak —';
+  document.getElementById('par-worker').textContent = r.workerName || '—';
+
+  const noteRow = document.getElementById('par-note-row');
+  const noteEl  = document.getElementById('par-note');
+  if (r.note) {
+    noteEl.textContent = r.note;
+    noteRow.style.display = '';
+  } else {
+    noteRow.style.display = 'none';
+  }
+
+  /* pozycje */
+  const linesEl = document.getElementById('par-lines');
+  linesEl.innerHTML = (r.lines || []).map(l => {
+    const icon = CATALOG_ICONS[l.id] || '🐴';
+    const sub  = (l.subtotal != null) ? fmt(l.subtotal) : fmt((l.price||0) * (l.qty||1));
+    const price = l.price != null ? fmt(l.price) : '—';
+    return `<div class="paragon-line">
+      <div class="paragon-line-name"><span class="paragon-line-icon">${icon}</span>${l.name||'—'}</div>
+      <div class="paragon-line-qty">×${l.qty||1}</div>
+      <div class="paragon-line-price">${price}</div>
+      <div class="paragon-line-sub">${sub}</div>
+    </div>`;
+  }).join('');
+
+  /* sumy */
+  document.getElementById('par-total').textContent      = fmt(r.total);
+  document.getElementById('par-stable').textContent     = fmt(r.stable);
+  document.getElementById('par-worker-cut').textContent = fmt(r.workerCut);
+
+  /* ID */
+  document.getElementById('par-id').textContent = 'ID: ' + (r._id || '—');
+
+  /* przycisk usuń tylko dla owner/deputy */
+  const actEl = document.getElementById('par-actions');
+  actEl.innerHTML = isOwnerLevel()
+    ? `<button class="btn btn-danger" onclick="deleteReceipt('${r._id}');closeReceiptModal()">🗑 Usuń rachunek</button>`
+    : '';
+
+  document.getElementById('receipt-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeReceiptModal = function(e) {
+  if (e && e.target !== document.getElementById('receipt-modal')) return;
+  document.getElementById('receipt-modal').classList.add('hidden');
+  document.body.style.overflow = '';
 };
 
 window.deleteReceipt = async function(id) {
@@ -964,38 +1016,45 @@ async function loadPayroll() {
       const totalPaid= workers.reduce((s,[,w]) => s + w.paid, 0);
       const totalRem = Math.max(0, totalWk - totalPaid);
 
+      const unpaid = workers.filter(([,w]) => Math.max(0, w.workerCut - w.paid) > 0);
+      const paid   = workers.filter(([,w]) => Math.max(0, w.workerCut - w.paid) <= 0);
+
+      const renderRows = (list, isPaid) => list.map(([uid,w]) => {
+        const rem = Math.max(0, w.workerCut - w.paid);
+        const safeName = w.name.replace(/'/g,"\\'");
+        return `<tr style="cursor:pointer" onclick="openWorkerModal('${uid}','${safeName}')">
+          <td><span style="color:var(--amber);margin-right:0.3rem">→</span>${w.name}</td>
+          <td style="color:#6abf7e">${fmt(w.workerCut)}</td>
+          <td class="muted">${fmt(w.paid)}</td>
+          <td><strong style="color:${isPaid?'#6abf7e':'var(--pale-gold)'}">${fmt(rem)}</strong></td>
+          <td>${isPaid
+            ? '<span class="badge badge-green">✓ Rozliczone</span>'
+            : '<span class="badge badge-red">Zaległe</span>'}
+          </td>
+        </tr>`;
+      }).join('');
+
+      const tableHtml = (rows) => `
+        <table class="western-table">
+          <thead><tr><th>Pracownik</th><th>Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+
       return `
         <div class="panel">
           <div class="panel-header">
             <div class="panel-title">💰 ${label}</div>
             <span style="font-family:var(--font-type);font-size:0.85rem;color:var(--dust)">
-              Do wypłaty: <strong style="color:var(--pale-gold);font-size:0.95rem">${fmt(totalRem)}</strong>
+              Do wypłaty: <strong style="color:${totalRem>0?'var(--pale-gold)':'#6abf7e'};font-size:0.95rem">${fmt(totalRem)}</strong>
             </span>
           </div>
           <div class="panel-body" style="padding:0">
-            <table class="western-table">
-              <thead>
-                <tr><th>Pracownik</th><th>Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th><th>Akcja</th></tr>
-              </thead>
-              <tbody>
-                ${workers.map(([uid,w]) => {
-                  const rem = Math.max(0, w.workerCut - w.paid);
-                  return `<tr>
-                    <td>${w.name}</td>
-                    <td style="color:#6abf7e">${fmt(w.workerCut)}</td>
-                    <td class="muted">${fmt(w.paid)}</td>
-                    <td><strong style="color:var(--pale-gold)">${fmt(rem)}</strong></td>
-                    <td>${rem > 0
-                      ? `<button class="btn btn-primary" style="padding:0.25rem 0.6rem;font-size:0.65rem"
-                          onclick="payWorker('${uid}','${w.name}','${wk}',${rem})">
-                          Wypłać ${fmt(rem)}
-                         </button>`
-                      : '<span class="badge badge-green">Wypłacono</span>'}
-                    </td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
+            ${unpaid.length ? `
+              <div class="payroll-section-label payroll-section-unpaid">⚠ Zaległe (${unpaid.length})</div>
+              ${tableHtml(renderRows(unpaid, false))}` : ''}
+            ${paid.length ? `
+              <div class="payroll-section-label payroll-section-paid">✓ Rozliczone (${paid.length})</div>
+              ${tableHtml(renderRows(paid, true))}` : ''}
           </div>
         </div>`;
     }).join('');
@@ -1010,6 +1069,7 @@ window.payWorker = async function(uid, name, weekKey, amount) {
     await addDoc(collection(db,'payouts'), {
       workerUid:  uid,
       workerName: name,
+      paidByName: currentProfile?.displayName || currentUser.email,
       week:       weekKey,
       month:      weekKey.includes('-W') ? weekKey.slice(0,4) + '-' + String(new Date().getMonth()+1).padStart(2,'0') : weekKey,
       amount,
@@ -1018,6 +1078,218 @@ window.payWorker = async function(uid, name, weekKey, amount) {
     });
     showToast(`✓ Wypłacono ${fmt(amount)} dla ${name}`);
     loadPayroll(); loadDashboard();
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+/* =====================================================
+   MODAL PRACOWNIKA — historia, tygodnie, wypłaty
+   ===================================================== */
+let _wmUid  = null;
+let _wmName = null;
+
+window.openWorkerModal = async function(uid, name) {
+  _wmUid  = uid;
+  _wmName = name;
+
+  document.getElementById('wm-name').textContent = name;
+  document.getElementById('wm-sub').textContent  = 'Ładowanie danych...';
+
+  /* Aktywuj pierwszą zakładkę */
+  wmSwitchTab('weeks');
+  document.getElementById('worker-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+
+  /* Pobierz dane równolegle */
+  try {
+    const [rSnap, pSnap] = await Promise.all([
+      getDocs(collection(db,'receipts')),
+      getDocs(collection(db,'payouts'))
+    ]);
+
+    const allReceipts = [];
+    rSnap.forEach(d => { const r = d.data(); if (r.workerUid === uid) allReceipts.push({ ...r, _id: d.id }); });
+    allReceipts.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+    const allPayouts = [];
+    pSnap.forEach(d => { const p = d.data(); if (p.workerUid === uid) allPayouts.push({ ...p, _id: d.id }); });
+    allPayouts.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+    /* --- Sumy globalne --- */
+    const totalEarned = allReceipts.reduce((s,r) => s + (r.workerCut||0), 0);
+    const totalPaid   = allPayouts.reduce((s,p)  => s + (p.amount||0),   0);
+    const totalDue    = Math.max(0, totalEarned - totalPaid);
+    document.getElementById('wm-sub').textContent =
+      `Zarobione: ${fmt(totalEarned)} · Wypłacono: ${fmt(totalPaid)} · Do wypłaty: ${fmt(totalDue)}`;
+
+    /* ---- ZAKŁADKA: Rachunki ---- */
+    const rTbody = document.getElementById('wm-receipts-body');
+    if (!allReceipts.length) {
+      rTbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:1.5rem">Brak rachunków</td></tr>';
+    } else {
+      rTbody.innerHTML = allReceipts.map(r => `
+        <tr onclick="openReceiptModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+          <td class="muted">${fmtD(r.createdAt)}</td>
+          <td>${r.client||'—'}</td>
+          <td style="font-size:0.75rem;color:var(--dust)">${(r.lines||[]).map(l=>`${l.name}×${l.qty}`).join(', ')}</td>
+          <td style="font-size:0.75rem;color:var(--dust);font-style:italic">${r.note||'—'}</td>
+          <td><strong style="color:var(--pale-gold)">${fmt(r.total)}</strong></td>
+          <td style="color:#6abf7e">${fmt(r.workerCut)}</td>
+        </tr>`).join('');
+    }
+
+    /* ---- ZAKŁADKA: Wypłaty ---- */
+    const pTbody = document.getElementById('wm-payouts-body');
+    if (!allPayouts.length) {
+      pTbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:1.5rem">Brak wypłat</td></tr>';
+    } else {
+      pTbody.innerHTML = allPayouts.map(p => `
+        <tr>
+          <td class="muted">${fmtD(p.createdAt)}</td>
+          <td style="font-family:var(--font-type);font-size:0.75rem;color:var(--dust)">${weekLabel(p.week||p.month)}</td>
+          <td><strong style="color:#6abf7e">${fmt(p.amount)}</strong></td>
+          <td class="muted" style="font-size:0.78rem">${p.paidByName||'—'}</td>
+        </tr>`).join('');
+    }
+
+    /* ---- ZAKŁADKA: Tygodnie ---- */
+    /* Zbuduj mapę tygodniową */
+    const weekMap = {};
+    allReceipts.forEach(r => {
+      const wk = r.week || dateToWeek(r.createdAt) || '—';
+      if (!weekMap[wk]) weekMap[wk] = { earned: 0, paid: 0 };
+      weekMap[wk].earned += r.workerCut || 0;
+    });
+    allPayouts.forEach(p => {
+      const wk = p.week || p.month || '—';
+      if (!weekMap[wk]) weekMap[wk] = { earned: 0, paid: 0 };
+      weekMap[wk].paid += p.amount || 0;
+    });
+
+    const weeks = Object.keys(weekMap).sort().reverse();
+    const weeksBody = document.getElementById('wm-weeks-body');
+    weeksBody.innerHTML = weeks.map(wk => {
+      const w   = weekMap[wk];
+      const due = Math.max(0, w.earned - w.paid);
+      const statusBadge = due <= 0
+        ? '<span class="badge badge-green">✓ Rozliczone</span>'
+        : `<button class="btn btn-primary" style="padding:0.25rem 0.7rem;font-size:0.68rem"
+            onclick="wmPayWeek('${wk}',${due})">Wypłać ${fmt(due)}</button>`;
+      return `
+        <div class="wm-week-block">
+          <div class="wm-week-header">
+            <div class="wm-week-label">${weekLabel(wk)}</div>
+            <div class="wm-week-stats">
+              <div class="wm-week-stat">Zakładka: <span>${fmt(w.earned)}</span></div>
+              <div class="wm-week-stat paid">Wypłacono: <span>${fmt(w.paid)}</span></div>
+              <div class="wm-week-stat due">Do wypłaty: <span>${fmt(due)}</span></div>
+            </div>
+            <div>${statusBadge}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    /* Przycisk "Wypłać wszystko" */
+    const payAllWrap = document.getElementById('wm-pay-all-wrap');
+    if (totalDue > 0) {
+      payAllWrap.innerHTML = `
+        <div class="wm-pay-all-info">
+          Łączne zaległości: <strong>${fmt(totalDue)}</strong>
+        </div>
+        <button class="btn btn-primary" onclick="wmPayAll(${totalDue})">
+          💰 Wypłać wszystko (${fmt(totalDue)})
+        </button>`;
+    } else {
+      payAllWrap.innerHTML = `
+        <div class="wm-pay-all-info">
+          Wszystkie tygodnie <strong style="color:#6abf7e">rozliczone ✓</strong>
+        </div>`;
+    }
+
+  } catch(e) {
+    console.error('openWorkerModal:', e);
+    document.getElementById('wm-sub').textContent = '❌ Błąd ładowania danych';
+  }
+};
+
+window.wmSwitchTab = function(tab) {
+  ['weeks','receipts','payouts'].forEach(t => {
+    document.getElementById('wm-tab-' + t).classList.toggle('active', t === tab);
+    document.getElementById('wm-panel-' + t).classList.toggle('hidden', t !== tab);
+  });
+};
+
+window.closeWorkerModal = function(e) {
+  if (e && e.target !== document.getElementById('worker-modal')) return;
+  document.getElementById('worker-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+};
+
+window.wmPayWeek = async function(weekKey, amount) {
+  if (!await showConfirm(
+    `Wypłacić ${fmt(amount)} dla ${_wmName}?\n${weekLabel(weekKey)}`,
+    'Wypłać', false
+  )) return;
+  try {
+    await addDoc(collection(db,'payouts'), {
+      workerUid:  _wmUid,
+      workerName: _wmName,
+      paidByName: currentProfile?.displayName || currentUser.email,
+      week:       weekKey,
+      month:      weekKey.slice(0,7),
+      amount,
+      paidBy:    currentUser.uid,
+      createdAt: serverTimestamp()
+    });
+    showToast(`✓ Wypłacono ${fmt(amount)} dla ${_wmName}`);
+    loadPayroll(); loadDashboard();
+    openWorkerModal(_wmUid, _wmName); // odśwież modal
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+window.wmPayAll = async function(totalDue) {
+  if (!await showConfirm(
+    `Wypłacić łącznie ${fmt(totalDue)} dla ${_wmName}?\nZostaną dodane wypłaty za wszystkie zaległe tygodnie.`,
+    'Wypłać wszystko', false
+  )) return;
+  try {
+    /* Pobierz aktualne dane żeby wyliczyć zaległości per tydzień */
+    const [rSnap, pSnap] = await Promise.all([
+      getDocs(collection(db,'receipts')),
+      getDocs(collection(db,'payouts'))
+    ]);
+    const weekMap = {};
+    rSnap.forEach(d => {
+      const r = d.data(); if (r.workerUid !== _wmUid) return;
+      const wk = r.week || dateToWeek(r.createdAt) || '—';
+      if (!weekMap[wk]) weekMap[wk] = { earned: 0, paid: 0 };
+      weekMap[wk].earned += r.workerCut || 0;
+    });
+    pSnap.forEach(d => {
+      const p = d.data(); if (p.workerUid !== _wmUid) return;
+      const wk = p.week || p.month || '—';
+      if (!weekMap[wk]) weekMap[wk] = { earned: 0, paid: 0 };
+      weekMap[wk].paid += p.amount || 0;
+    });
+
+    const promises = [];
+    for (const [wk, w] of Object.entries(weekMap)) {
+      const due = Math.max(0, w.earned - w.paid);
+      if (due <= 0) continue;
+      promises.push(addDoc(collection(db,'payouts'), {
+        workerUid:  _wmUid,
+        workerName: _wmName,
+        paidByName: currentProfile?.displayName || currentUser.email,
+        week:       wk,
+        month:      wk.slice(0,7),
+        amount:     due,
+        paidBy:     currentUser.uid,
+        createdAt:  serverTimestamp()
+      }));
+    }
+    await Promise.all(promises);
+    showToast(`✓ Wypłacono ${fmt(totalDue)} dla ${_wmName} (${promises.length} tygodni)`);
+    loadPayroll(); loadDashboard();
+    openWorkerModal(_wmUid, _wmName); // odśwież modal
   } catch(e) { showToast('❌ ' + e.message); }
 };
 
@@ -1507,43 +1779,29 @@ window.showToast = function(msg) {
 };
 
 document.addEventListener('keydown', e => {
-  if (e.key==='Enter' && !document.getElementById('login-screen').classList.contains('hidden')) doLogin();
-  if (e.key==='Escape') {
-    const overlay = document.getElementById('catalog-overlay');
-    if (overlay && !overlay.classList.contains('hidden')) closeCatalogOverlay();
+  if (e.key === 'Enter' && !document.getElementById('public-screen').classList.contains('hidden')) doLogin();
+  if (e.key === 'Escape') {
+    const wm = document.getElementById('worker-modal');
+    if (wm && !wm.classList.contains('hidden')) {
+      wm.classList.add('hidden');
+      document.body.style.overflow = '';
+      return;
+    }
+    const rm = document.getElementById('receipt-modal');
+    if (rm && !rm.classList.contains('hidden')) {
+      rm.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
   }
 });
 
 
-/* =====================================================
-   KATALOG KONI — overlay na ekranie logowania
-   ===================================================== */
+
 
 /* =====================================================
-   SEKRETNY TRIGGER LOGOWANIA — klik w "Jack Miller"
+   KATALOG KONI — usunięty
    ===================================================== */
-let _secretClickCount = 0;
-let _secretTimer      = null;
-
-window.onSecretTrigger = function() {
-  /* Wymagane pojedyncze kliknięcie — panel pojawia się od razu */
-  showLoginPanel();
-};
-
-function showLoginPanel() {
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('login-email').focus();
-}
-
-window.hideLoginPanel = function() {
-  document.getElementById('login-screen').classList.add('hidden');
-  const btn = document.getElementById('login-btn');
-  if (btn) { btn.disabled = false; btn.textContent = 'Wejdź do Stajni'; }
-  const err = document.getElementById('login-error');
-  if (err) err.style.display = 'none';
-};
-
-const HORSE_CATALOG = {
+const HORSE_CATALOG_DISABLED = {
   muly: {
     label: 'Muły',
     icon:  '🐴',
@@ -1762,86 +2020,3 @@ const HORSE_CATALOG = {
   /* Kolejne kategorie dodaj tutaj w tym samym formacie */
 };
 
-let _currentCatId = null;
-
-window.openCatalogOverlay = function() {
-  /* Nie potrzeba — katalog jest już na public-screen */
-};
-window.closeCatalogOverlay = function() {
-  /* Nie potrzeba — katalog jest już na public-screen */
-};
-
-function renderCatalogCategories() {
-  const grid = document.getElementById('cat-categories-grid');
-  if (!grid) return;
-  grid.innerHTML = Object.entries(HORSE_CATALOG).map(([id, cat]) => `
-    <div class="cat-category-card" onclick="openCatalogCategory('${id}')">
-      <div class="cat-cat-icon">${cat.icon}</div>
-      <div class="cat-cat-name">${cat.label}</div>
-      <div class="cat-cat-count">${cat.konie.length} umaszczeni</div>
-    </div>`).join('');
-}
-
-window.openCatalogCategory = function(catId) {
-  _currentCatId = catId;
-  const cat = HORSE_CATALOG[catId];
-  if (!cat) return;
-
-  showAllLevelsHidden();
-  document.getElementById('horses-screen').classList.remove('hidden');
-
-  document.getElementById('horses-screen-title').textContent = cat.icon + ' ' + cat.label;
-  const sub = document.getElementById('horses-screen-sub');
-  if (sub) sub.textContent = cat.desc;
-
-  const grid = document.getElementById('cat-horses-grid');
-  grid.className = 'cat-horses-grid cat-' + catId;
-  grid.innerHTML = cat.konie.map(h => `
-    <div class="cat-horse-card ${h.legendary ? 'legendary' : ''}"
-      onclick="openHorseDetail('${catId}','${h.id}')">
-      ${h.legendary ? '<div class="cat-horse-badge">⭐ Legendarny</div>' : ''}
-      <div class="cat-horse-img-wrap">
-        <img class="cat-horse-img" src="${h.img}" alt="${h.name}" loading="lazy"/>
-      </div>
-      <div class="cat-horse-body">
-        <div class="cat-horse-name">${h.name}</div>
-        <div class="cat-horse-coat">${h.coat}</div>
-      </div>
-    </div>`).join('');
-};
-
-window.openHorseDetail = function(catId, horseId) {
-  const cat   = HORSE_CATALOG[catId];
-  const horse = cat?.konie.find(h => h.id === horseId);
-  if (!horse) return;
-
-  showAllLevelsHidden();
-  document.getElementById('horse-detail-screen').classList.remove('hidden');
-
-  document.getElementById('detail-img').src          = horse.img;
-  document.getElementById('detail-title').textContent = horse.name;
-  document.getElementById('detail-category').textContent = cat.label;
-  document.getElementById('detail-name').textContent  = horse.name;
-  document.getElementById('detail-coat').textContent  = horse.coat;
-  document.getElementById('detail-desc').textContent  = horse.desc;
-};
-
-window.backToCategories = function() {
-  showAllLevelsHidden();
-  renderCatalogCategories();
-  document.getElementById('cat-screen').classList.remove('hidden');
-};
-
-window.backToHorses = function() {
-  if (_currentCatId) openCatalogCategory(_currentCatId);
-};
-
-/* ESC zamyka overlay */
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    const overlay = document.getElementById('catalog-overlay');
-    if (overlay && !overlay.classList.contains('hidden')) {
-      closeCatalogOverlay();
-    }
-  }
-});

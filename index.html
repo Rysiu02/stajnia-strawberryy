@@ -27,97 +27,30 @@
 <!-- ══ STRONA PUBLICZNA ══ -->
 <div id="public-screen" class="hidden">
 
-  <!-- POZIOM 1: Strona startowa — jeden kafelek -->
+  <!-- Strona startowa — logowanie -->
   <div id="start-screen" class="pub-level">
     <div class="pub-brand">
       <div class="pub-brand-icon">🐎</div>
       <div class="pub-brand-name">Stajnia Strawberry</div>
       <div class="pub-brand-sub">A.D. 1905</div>
     </div>
-    <div class="pub-main-tile" onclick="showCatScreen()">
-      <div class="pub-tile-icon">🐎</div>
-      <div class="pub-tile-name">Katalog Koni</div>
-      <div class="pub-tile-desc">Przeglądaj dostępne rasy i umaszczenia</div>
-      <div class="pub-tile-arrow">→</div>
-    </div>
-  </div>
-
-  <!-- POZIOM 2: Kategorie koni -->
-  <div id="cat-screen" class="pub-level hidden">
-    <div class="pub-top-bar">
-      <button class="cat-back-btn" onclick="showStartScreen()">← Powrót</button>
-      <div>
-        <div class="pub-bar-title">Katalog Koni</div>
-        <div class="pub-bar-sub">Wybierz kategorię</div>
-      </div>
-      <div></div>
-    </div>
-    <div class="cat-categories-grid" id="cat-categories-grid"></div>
-  </div>
-
-  <!-- POZIOM 3: Lista koni w kategorii -->
-  <div id="horses-screen" class="pub-level hidden">
-    <div class="pub-top-bar">
-      <button class="cat-back-btn" onclick="backToCategories()">← Kategorie</button>
-      <div>
-        <div class="pub-bar-title" id="horses-screen-title">—</div>
-        <div class="pub-bar-sub" id="horses-screen-sub">—</div>
-      </div>
-      <div></div>
-    </div>
-    <div class="cat-horses-grid" id="cat-horses-grid"></div>
-  </div>
-
-  <!-- POZIOM 4: Szczegóły konia -->
-  <div id="horse-detail-screen" class="pub-level hidden">
-    <div class="pub-top-bar">
-      <button class="cat-back-btn" onclick="backToHorses()">← Lista</button>
-      <div class="pub-bar-title" id="detail-title">—</div>
-      <div></div>
-    </div>
-    <div class="horse-detail-body">
-      <div class="horse-detail-img-wrap">
-        <img id="detail-img" src="" alt=""/>
-      </div>
-      <div class="horse-detail-info">
-        <div class="horse-detail-category" id="detail-category">—</div>
-        <div class="horse-detail-name" id="detail-name">—</div>
-        <div class="horse-detail-coat" id="detail-coat">—</div>
-        <div class="horse-detail-divider">✦ opis ✦</div>
-        <div class="horse-detail-desc" id="detail-desc">—</div>
-        <button class="cat-back-btn" style="margin-top:1.5rem" onclick="backToHorses()">← Wróć do listy</button>
+    <div class="login-box">
+      <div class="login-seal">🤠</div>
+      <div class="login-title">Stajnia Strawberry</div>
+      <div class="login-sub">System Zarządzania · A.D. 1905</div>
+      <div class="login-divider">✦ zaloguj się ✦</div>
+      <div id="login-form">
+        <input class="login-input" type="email"    id="login-email" placeholder="Adres e-mail..." autocomplete="email"/>
+        <input class="login-input" type="password" id="login-pass"  placeholder="Hasło dostępu..." autocomplete="current-password"/>
+        <div id="login-error" class="login-error" style="display:none"></div>
+        <button class="login-submit" id="login-btn" onclick="doLogin()">Wejdź do Stajni</button>
       </div>
     </div>
-  </div>
-
-  <!-- Stopka z sekretnym triggerem -->
-  <div class="pub-footer">
-    <span
-      id="secret-trigger"
-      onclick="onSecretTrigger()"
-      class="pub-footer-name">
-      ✦ Jack Miller ✦
-    </span>
-  </div>
-
-</div>
-
-<!-- ══ UKRYTY PANEL LOGOWANIA — trigger w stopce ══ -->
-<div id="login-screen" class="hidden">
-  <div class="login-box">
-    <div class="login-seal">🤠</div>
-    <div class="login-title">Stajnia Strawberry</div>
-    <div class="login-sub">System Zarządzania · A.D. 1905</div>
-    <div class="login-divider">✦ zaloguj się ✦</div>
-    <div id="login-form">
-      <input class="login-input" type="email"    id="login-email" placeholder="Adres e-mail..." autocomplete="email"/>
-      <input class="login-input" type="password" id="login-pass"  placeholder="Hasło dostępu..." autocomplete="current-password"/>
-      <div id="login-error" class="login-error" style="display:none"></div>
-      <button class="login-submit" id="login-btn" onclick="doLogin()">Wejdź do Stajni</button>
+    <div class="pub-footer">
+      <span class="pub-footer-name">✦ Jack Miller ✦</span>
     </div>
-    <button class="btn btn-ghost" style="width:100%;margin-top:0.5rem;font-size:0.7rem"
-      onclick="hideLoginPanel()">← Zamknij</button>
   </div>
+
 </div>
 
 <!-- APP -->
@@ -365,10 +298,10 @@
         <div class="panel-body" style="padding:0">
           <table class="western-table">
             <thead>
-              <tr><th>Data</th><th>Klient</th><th>Pracownik</th><th>Pozycje</th><th>Kwota</th><th>Stajnia</th><th>Pracownik</th><th></th></tr>
+              <tr><th>Data</th><th>Klient</th><th>Pracownik</th><th>Pozycje</th><th>Uwagi</th><th>Kwota</th><th>Stajnia</th><th>Pracownik</th><th></th></tr>
             </thead>
             <tbody id="receipts-history-body">
-              <tr><td colspan="8" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+              <tr><td colspan="9" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
             </tbody>
           </table>
         </div>
@@ -810,19 +743,127 @@
   </div>
 </div>
 
-<!-- MODAL DIALOGU — zamiast confirm() przeglądarki -->
-<div id="western-dialog" class="modal-overlay hidden">
-  <div class="modal-box" style="max-width:420px">
-    <div class="modal-header">
-      <div class="panel-title">⚠ Potwierdzenie</div>
+<!-- MODAL PARAGONU -->
+<div id="receipt-modal" class="modal-overlay hidden" onclick="closeReceiptModal(event)">
+  <div class="receipt-modal-box" id="receipt-modal-box">
+    <button class="receipt-modal-close" onclick="closeReceiptModal()">&times;</button>
+
+    <div class="paragon-header">
+      <div class="paragon-logo">🐎</div>
+      <div class="paragon-title">Stajnia Strawberry</div>
+      <div class="paragon-sub">A.D. 1905 · Rancho Rachunkowe</div>
+      <div class="paragon-divider">✦ ─── PARAGON ─── ✦</div>
     </div>
-    <div class="modal-body">
-      <p id="dialog-msg" style="font-family:var(--font-body);font-size:1rem;color:var(--cream);line-height:1.6;margin-bottom:1.5rem;white-space:pre-line"></p>
-      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
-        <button class="btn btn-ghost" onclick="_dialogCancel()">Anuluj</button>
-        <button class="btn btn-danger" id="dialog-confirm-btn" onclick="_dialogConfirm()">Potwierdź</button>
+
+    <div class="paragon-meta">
+      <div class="paragon-meta-row">
+        <span class="paragon-meta-label">Data</span>
+        <span class="paragon-meta-val" id="par-date">—</span>
+      </div>
+      <div class="paragon-meta-row">
+        <span class="paragon-meta-label">Klient</span>
+        <span class="paragon-meta-val" id="par-client">—</span>
+      </div>
+      <div class="paragon-meta-row">
+        <span class="paragon-meta-label">Kasjer</span>
+        <span class="paragon-meta-val" id="par-worker">—</span>
+      </div>
+      <div class="paragon-meta-row" id="par-note-row">
+        <span class="paragon-meta-label">Uwagi</span>
+        <span class="paragon-meta-val paragon-meta-note" id="par-note">—</span>
       </div>
     </div>
+
+    <div class="paragon-divider paragon-divider--thin">· · · · · · · · · · · · · · · · · · · ·</div>
+
+    <div class="paragon-lines-header">
+      <span>Pozycja</span>
+      <span>Ilość</span>
+      <span>Cena</span>
+      <span>Suma</span>
+    </div>
+    <div id="par-lines"></div>
+
+    <div class="paragon-divider paragon-divider--thin">· · · · · · · · · · · · · · · · · · · ·</div>
+
+    <div class="paragon-totals">
+      <div class="paragon-total-row">
+        <span>RAZEM</span>
+        <strong id="par-total" class="paragon-grand-total">—</strong>
+      </div>
+      <div class="paragon-split">
+        <div class="paragon-split-item paragon-split--stable">
+          <div class="paragon-split-label">🏦 Stajnia (50%)</div>
+          <div class="paragon-split-val" id="par-stable">—</div>
+        </div>
+        <div class="paragon-split-divider">│</div>
+        <div class="paragon-split-item paragon-split--worker">
+          <div class="paragon-split-label">👷 Pracownik (50%)</div>
+          <div class="paragon-split-val" id="par-worker-cut">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="paragon-footer">
+      <div class="paragon-footer-ornament">✦ ─── ✦ ─── ✦</div>
+      <div class="paragon-footer-text">Dziękujemy za korzystanie ze Stajni Strawberry</div>
+      <div class="paragon-footer-id" id="par-id">—</div>
+    </div>
+
+    <div class="paragon-actions" id="par-actions"></div>
+  </div>
+</div>
+
+<!-- MODAL PRACOWNIKA — historia rachunków, wypłat, rozliczenia tygodniowe -->
+<div id="worker-modal" class="modal-overlay hidden" onclick="closeWorkerModal(event)">
+  <div class="worker-modal-box">
+    <button class="receipt-modal-close" onclick="closeWorkerModal()">&times;</button>
+
+    <div class="worker-modal-header">
+      <div class="worker-modal-avatar" id="wm-avatar">👤</div>
+      <div>
+        <div class="worker-modal-name" id="wm-name">—</div>
+        <div class="worker-modal-sub" id="wm-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Zakładki -->
+    <div class="wm-tabs">
+      <button class="wm-tab active" id="wm-tab-weeks"   onclick="wmSwitchTab('weeks')">💰 Tygodnie</button>
+      <button class="wm-tab"        id="wm-tab-receipts" onclick="wmSwitchTab('receipts')">🧾 Rachunki</button>
+      <button class="wm-tab"        id="wm-tab-payouts"  onclick="wmSwitchTab('payouts')">✅ Wypłaty</button>
+    </div>
+
+    <!-- Panel: tygodnie z wypłatami -->
+    <div class="wm-panel" id="wm-panel-weeks">
+      <div class="wm-panel-actions" id="wm-pay-all-wrap"></div>
+      <div id="wm-weeks-body"></div>
+    </div>
+
+    <!-- Panel: wszystkie rachunki -->
+    <div class="wm-panel hidden" id="wm-panel-receipts">
+      <table class="western-table">
+        <thead>
+          <tr><th>Data</th><th>Klient</th><th>Pozycje</th><th>Uwagi</th><th>Kwota</th><th>Zakładka</th></tr>
+        </thead>
+        <tbody id="wm-receipts-body">
+          <tr><td colspan="6" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Panel: otrzymane wypłaty -->
+    <div class="wm-panel hidden" id="wm-panel-payouts">
+      <table class="western-table">
+        <thead>
+          <tr><th>Data</th><th>Tydzień</th><th>Kwota</th><th>Wypłacił</th></tr>
+        </thead>
+        <tbody id="wm-payouts-body">
+          <tr><td colspan="4" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
   </div>
 </div>
 
