@@ -229,6 +229,12 @@
           <div class="panel-title">+ Nowy Rachunek</div>
         </div>
         <div class="panel-body">
+          <!-- Baner trybu edycji rachunku -->
+          <div id="rec-edit-banner" style="display:none;margin-bottom:1rem;padding:0.6rem 1rem;background:rgba(180,130,40,0.15);border:1px solid var(--amber);border-radius:6px;font-family:var(--font-type);font-size:0.8rem;color:var(--pale-gold);align-items:center;gap:0.75rem">
+            <span>✏️ Edytujesz rachunek · ID: <span id="rec-edit-id" style="color:var(--dust)">—</span></span>
+            <button class="btn btn-ghost" style="padding:0.2rem 0.6rem;font-size:0.7rem;margin-left:auto" onclick="cancelEditReceipt()">✕ Anuluj edycję</button>
+          </div>
+
           <div class="form-grid form-grid-2" style="margin-bottom:1.5rem">
             <div class="form-group">
               <label>Klient (opcjonalnie)</label>
@@ -237,6 +243,16 @@
             <div class="form-group">
               <label>Uwagi</label>
               <input class="form-input" id="rec-note" type="text" placeholder="Opcjonalne..."/>
+            </div>
+          </div>
+
+          <!-- Wybór pracownika — widoczny tylko dla owner/deputy -->
+          <div id="rec-as-worker-wrap" style="display:none" class="worker-select-block">
+            <span class="wsb-label">🤠 Kasjer / Pracownik</span>
+            <div class="western-select-wrap">
+              <select class="form-input" id="rec-as-worker">
+                <option value="">— ja (domyślnie) —</option>
+              </select>
             </div>
           </div>
 
@@ -279,7 +295,7 @@
           </div>
 
           <div style="margin-top:1rem;display:flex;gap:0.75rem">
-            <button class="btn btn-primary" onclick="saveReceipt()">💾 Zapisz rachunek</button>
+            <button class="btn btn-primary" id="rec-save-btn" onclick="saveReceipt()">💾 Zapisz rachunek</button>
             <button class="btn btn-ghost"   onclick="clearReceipt()">Wyczyść koszyk</button>
           </div>
         </div>
@@ -755,62 +771,136 @@
       <div class="paragon-divider">✦ ─── PARAGON ─── ✦</div>
     </div>
 
-    <div class="paragon-meta">
-      <div class="paragon-meta-row">
-        <span class="paragon-meta-label">Data</span>
-        <span class="paragon-meta-val" id="par-date">—</span>
-      </div>
-      <div class="paragon-meta-row">
-        <span class="paragon-meta-label">Klient</span>
-        <span class="paragon-meta-val" id="par-client">—</span>
-      </div>
-      <div class="paragon-meta-row">
-        <span class="paragon-meta-label">Kasjer</span>
-        <span class="paragon-meta-val" id="par-worker">—</span>
-      </div>
-      <div class="paragon-meta-row" id="par-note-row">
-        <span class="paragon-meta-label">Uwagi</span>
-        <span class="paragon-meta-val paragon-meta-note" id="par-note">—</span>
-      </div>
-    </div>
-
-    <div class="paragon-divider paragon-divider--thin">· · · · · · · · · · · · · · · · · · · ·</div>
-
-    <div class="paragon-lines-header">
-      <span>Pozycja</span>
-      <span>Ilość</span>
-      <span>Cena</span>
-      <span>Suma</span>
-    </div>
-    <div id="par-lines"></div>
-
-    <div class="paragon-divider paragon-divider--thin">· · · · · · · · · · · · · · · · · · · ·</div>
-
-    <div class="paragon-totals">
-      <div class="paragon-total-row">
-        <span>RAZEM</span>
-        <strong id="par-total" class="paragon-grand-total">—</strong>
-      </div>
-      <div class="paragon-split">
-        <div class="paragon-split-item paragon-split--stable">
-          <div class="paragon-split-label">🏦 Stajnia (50%)</div>
-          <div class="paragon-split-val" id="par-stable">—</div>
+    <!-- ── TRYB PODGLĄD ── -->
+    <div id="par-view-content">
+      <div class="paragon-meta">
+        <div class="paragon-meta-row">
+          <span class="paragon-meta-label">Data</span>
+          <span class="paragon-meta-val" id="par-date">—</span>
         </div>
-        <div class="paragon-split-divider">│</div>
-        <div class="paragon-split-item paragon-split--worker">
-          <div class="paragon-split-label">👷 Pracownik (50%)</div>
-          <div class="paragon-split-val" id="par-worker-cut">—</div>
+        <div class="paragon-meta-row">
+          <span class="paragon-meta-label">Klient</span>
+          <span class="paragon-meta-val" id="par-client">—</span>
+        </div>
+        <div class="paragon-meta-row">
+          <span class="paragon-meta-label">Kasjer</span>
+          <span class="paragon-meta-val" id="par-worker">—</span>
+        </div>
+        <div class="paragon-meta-row" id="par-note-row">
+          <span class="paragon-meta-label">Uwagi</span>
+          <span class="paragon-meta-val paragon-meta-note" id="par-note">—</span>
         </div>
       </div>
+
+      <div class="paragon-divider paragon-divider--thin">· · · · · · · · · · · · · · · · · · · ·</div>
+
+      <div class="paragon-lines-header">
+        <span>Pozycja</span>
+        <span>Ilość</span>
+        <span>Cena</span>
+        <span>Suma</span>
+      </div>
+      <div id="par-lines"></div>
+
+      <div class="paragon-divider paragon-divider--thin">· · · · · · · · · · · · · · · · · · · ·</div>
+
+      <div class="paragon-totals">
+        <div class="paragon-total-row">
+          <span>RAZEM</span>
+          <strong id="par-total" class="paragon-grand-total">—</strong>
+        </div>
+        <div class="paragon-split">
+          <div class="paragon-split-item paragon-split--stable">
+            <div class="paragon-split-label">🏦 Stajnia (50%)</div>
+            <div class="paragon-split-val" id="par-stable">—</div>
+          </div>
+          <div class="paragon-split-divider">│</div>
+          <div class="paragon-split-item paragon-split--worker">
+            <div class="paragon-split-label">👷 Pracownik (50%)</div>
+            <div class="paragon-split-val" id="par-worker-cut">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="paragon-footer">
+        <div class="paragon-footer-ornament">✦ ─── ✦ ─── ✦</div>
+        <div class="paragon-footer-text">Dziękujemy za korzystanie ze Stajni Strawberry</div>
+        <div class="paragon-footer-id" id="par-id">—</div>
+      </div>
+
+      <div class="paragon-actions" id="par-actions"></div>
     </div>
 
-    <div class="paragon-footer">
-      <div class="paragon-footer-ornament">✦ ─── ✦ ─── ✦</div>
-      <div class="paragon-footer-text">Dziękujemy za korzystanie ze Stajni Strawberry</div>
-      <div class="paragon-footer-id" id="par-id">—</div>
+    <!-- ── TRYB EDYCJA (ukryty domyślnie) ── -->
+    <div id="par-edit-panel" style="display:none;padding:0 2rem 1.5rem">
+
+      <!-- Pola meta -->
+      <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem">
+        <div class="paragon-meta-row">
+          <span class="paragon-meta-label">Klient</span>
+          <input class="form-input par-edit-field" id="par-edit-client" type="text" placeholder="Imię klienta..."/>
+        </div>
+        <div class="paragon-meta-row">
+          <span class="paragon-meta-label">Kasjer</span>
+          <div class="western-select-wrap" style="flex:1;min-width:0">
+            <select class="form-input" id="par-edit-worker"
+              style="padding:0.28rem 2.4rem 0.28rem 0.55rem;font-size:0.85rem">
+              <option value="">— ładowanie... —</option>
+            </select>
+          </div>
+        </div>
+        <div class="paragon-meta-row">
+          <span class="paragon-meta-label">Uwagi</span>
+          <input class="form-input par-edit-field" id="par-edit-note" type="text" placeholder="Opcjonalne..."/>
+        </div>
+      </div>
+
+      <div class="paragon-divider paragon-divider--thin">· · · · · · · · · · · · · · · · · · · ·</div>
+
+      <!-- Nagłówek pozycji -->
+      <div style="font-family:var(--font-type);font-size:0.6rem;color:var(--amber);text-transform:uppercase;letter-spacing:0.1em;padding:0.4rem 0 0.2rem;opacity:0.8">
+        Pozycje rachunku
+      </div>
+
+      <!-- Lista edytowalnych pozycji -->
+      <div id="par-edit-lines"></div>
+
+      <!-- Dodaj pozycję z cennika -->
+      <div style="margin-top:0.75rem">
+        <div style="font-family:var(--font-type);font-size:0.6rem;color:var(--dust);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;opacity:0.7">
+          ➕ Dodaj z cennika
+        </div>
+        <div id="par-edit-add-tiles" style="display:flex;flex-wrap:wrap;gap:0.35rem"></div>
+      </div>
+
+      <div class="paragon-divider paragon-divider--thin" style="margin-top:1rem">· · · · · · · · · · · · · · · · · · · ·</div>
+
+      <!-- Sumy edycji -->
+      <div class="paragon-totals" style="padding-left:0;padding-right:0">
+        <div class="paragon-total-row">
+          <span>RAZEM</span>
+          <strong id="par-edit-total" class="paragon-grand-total">—</strong>
+        </div>
+        <div class="paragon-split">
+          <div class="paragon-split-item paragon-split--stable">
+            <div class="paragon-split-label">🏦 Stajnia (50%)</div>
+            <div class="paragon-split-val" id="par-edit-stable">—</div>
+          </div>
+          <div class="paragon-split-divider">│</div>
+          <div class="paragon-split-item paragon-split--worker">
+            <div class="paragon-split-label">👷 Pracownik (50%)</div>
+            <div class="paragon-split-val" id="par-edit-worker-cut">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Przyciski edycji -->
+      <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem">
+        <button class="btn btn-primary" onclick="saveReceiptEdits()">💾 Zapisz zmiany</button>
+        <button class="btn btn-ghost"   onclick="cancelReceiptEdit()">Anuluj</button>
+      </div>
     </div>
 
-    <div class="paragon-actions" id="par-actions"></div>
   </div>
 </div>
 

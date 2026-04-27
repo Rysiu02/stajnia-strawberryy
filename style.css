@@ -658,14 +658,107 @@ main {
   font-family: var(--font-type);
   font-size: 0.85rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   border-color: var(--amber);
   box-shadow: 0 0 8px rgba(196,122,43,0.2);
 }
+.form-input::placeholder, .form-textarea::placeholder {
+  color: rgba(200,176,128,0.35);
+  font-style: italic;
+}
 .form-select option { background: #1e1005; }
 .form-textarea { resize: vertical; min-height: 80px; }
+
+/* ── Klimatyczny select western ── */
+.western-select-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.western-select-wrap select.form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.4rem;
+  background:
+    linear-gradient(135deg, rgba(26,12,2,0.95) 0%, rgba(14,7,1,0.95) 100%);
+  border: 1px solid rgba(196,122,43,0.45);
+  color: var(--cream);
+  font-family: var(--font-type);
+  font-size: 0.85rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  flex: 1;
+  min-width: 0;
+}
+.western-select-wrap select.form-input:focus {
+  border-color: var(--pale-gold);
+  box-shadow: 0 0 0 2px rgba(196,122,43,0.2), 0 0 12px rgba(196,122,43,0.15);
+  outline: none;
+}
+.western-select-wrap select.form-input:hover {
+  border-color: var(--amber);
+  background: linear-gradient(135deg, rgba(36,18,4,0.98) 0%, rgba(20,10,2,0.98) 100%);
+}
+.western-select-wrap::after {
+  content: '';
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 7l5 6 5-6' stroke='%23c47a2b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+  transition: transform 0.15s;
+}
+.western-select-wrap select.form-input option {
+  background: #1a0c02;
+  color: var(--cream);
+  font-family: var(--font-type);
+  padding: 0.4rem 0.6rem;
+}
+.western-select-wrap select.form-input option:checked {
+  background: #3a1e06;
+  color: var(--pale-gold);
+}
+
+/* Select kasjeraf w nowym rachunku */
+.worker-select-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(20,10,2,0.6), rgba(10,5,0,0.8));
+  border: 1px solid rgba(196,122,43,0.2);
+  border-left: 3px solid var(--amber);
+  margin-bottom: 1.25rem;
+}
+.worker-select-block .wsb-label {
+  font-family: var(--font-type);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: var(--amber);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.worker-select-block .wsb-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, rgba(196,122,43,0.3), transparent);
+}
+.worker-select-block .western-select-wrap select.form-input {
+  padding: 0.4rem 2.4rem 0.4rem 0.7rem;
+  font-size: 0.82rem;
+}
 
 /* =====================================================
    WAREHOUSE ITEMS
@@ -1710,7 +1803,9 @@ main {
 
 .receipt-modal-box {
   position: relative;
-  width: min(480px, 95vw);
+  width: min(560px, 95vw);
+  max-height: 88vh;
+  overflow-y: auto;
   margin: auto;
   background:
     repeating-linear-gradient(
@@ -1959,6 +2054,120 @@ main {
   display: flex;
   justify-content: center;
   gap: 0.75rem;
+}
+
+/* Kompaktowe pole w panelu edycji rachunku */
+.par-edit-field {
+  flex: 1;
+  min-width: 0;
+  padding: 0.28rem 0.55rem;
+  font-size: 0.85rem;
+  background: rgba(10,5,0,0.55);
+  border: 1px solid rgba(196,122,43,0.3);
+  color: var(--cream);
+  font-family: var(--font-type);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  letter-spacing: 0.03em;
+}
+.par-edit-field:focus {
+  border-color: var(--pale-gold);
+  box-shadow: 0 0 0 2px rgba(196,122,43,0.18);
+}
+.par-edit-field::placeholder { color: rgba(200,176,128,0.35); }
+
+/* Kafelki dodawania pozycji w edycji rachunku */
+.par-edit-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.55rem;
+  background: rgba(196,122,43,0.1);
+  border: 1px solid rgba(196,122,43,0.28);
+  border-radius: 4px;
+  color: var(--cream);
+  font-family: var(--font-type);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.par-edit-tile:hover {
+  background: rgba(196,122,43,0.22);
+  border-color: var(--amber);
+  color: var(--pale-gold);
+}
+.par-edit-tile .pet-price {
+  color: var(--dust);
+  font-size: 0.62rem;
+  margin-left: 0.1rem;
+}
+.par-edit-row {
+  border-bottom: 1px solid rgba(196,122,43,0.13);
+  padding: 0.45rem 0;
+}
+.par-edit-row:last-child { border-bottom: none; }
+.par-edit-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+.par-edit-row-name {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.par-edit-row-bottom {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.par-edit-row-label {
+  font-family: var(--font-type);
+  font-size: 0.6rem;
+  color: var(--dust);
+  letter-spacing: 0.06em;
+}
+.par-edit-row-sub {
+  font-family: var(--font-head);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--pale-gold);
+  margin-left: auto;
+  white-space: nowrap;
+}
+.par-edit-remove {
+  background: none;
+  border: none;
+  color: rgba(200,100,100,0.7);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.1rem 0.25rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+}
+.par-edit-remove:hover { color: #e08080; background: rgba(180,50,50,0.2); }
+.par-edit-price-input {
+  width: 72px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(196,122,43,0.35);
+  color: var(--cream);
+  padding: 0.2rem 0.35rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 /* Kliknięty wiersz w tabeli */

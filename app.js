@@ -90,7 +90,11 @@ let currentProfile = null;
 let currentRole    = null;
 let warehouseCache = [];
 let editingItemId  = null;
+let editingReceiptId = null;   // ID rachunku w trybie edycji koszyka (null = nowy)
+let receiptWorkers   = [];     // cache pracowników do selecta
 let movingItemId   = null;
+let _currentReceiptData = null; // rachunek aktualnie otwarty w modalu
+let _editLines = [];            // kopia pozycji w trybie edycji modalu
 
 /* =====================================================
    AUTH
@@ -270,6 +274,7 @@ function loadAll() {
   loadTax();
   loadNotes();
   renderBasket();  // inicjalizuj pusty koszyk
+  loadReceiptWorkers(); // lista pracowników do selecta w rachunku
 }
 
 /* =====================================================
@@ -342,6 +347,10 @@ function applyRoleRestrictions() {
   // Panel dodawania wydatków — tylko owner/deputy
   const ep = document.getElementById('add-expense-panel');
   if (ep) ep.style.display = isOwnerLevel() ? 'block' : 'none';
+
+  // Select pracownika w formularzu rachunku — tylko owner/deputy
+  const recWorkerWrap = document.getElementById('rec-as-worker-wrap');
+  if (recWorkerWrap) recWorkerWrap.style.display = isOwnerLevel() ? 'block' : 'none';
 
   // Przycisk nowej pozycji w magazynie — nie dla viewera
   const addWhBtn = document.querySelector('#section-warehouse .page-header .btn');
@@ -725,6 +734,15 @@ window.clearReceipt = function() {
   pendingHorse = null;
   document.getElementById('rec-client').value = '';
   document.getElementById('rec-note').value   = '';
+  /* Reset trybu edycji */
+  editingReceiptId = null;
+  const banner = document.getElementById('rec-edit-banner');
+  if (banner) banner.style.display = 'none';
+  const saveBtn = document.getElementById('rec-save-btn');
+  if (saveBtn) saveBtn.textContent = '💾 Zapisz rachunek';
+  /* Reset selecta pracownika */
+  const sel = document.getElementById('rec-as-worker');
+  if (sel) sel.value = '';
   renderBasket();
 };
 
@@ -739,35 +757,58 @@ window.saveReceipt = async function() {
   const client = document.getElementById('rec-client').value.trim();
   const note   = document.getElementById('rec-note').value.trim();
 
-  try {
-    await addDoc(collection(db,'receipts'), {
-      lines, total, stable: half, workerCut: half,
-      client, note, month, week,
-      workerUid:  currentUser.uid,
-      workerName: currentProfile?.displayName || currentUser.email,
-      createdAt:  serverTimestamp()
-    });
-    showToast('✓ Rachunek zapisany');
+  /* Wyznacz pracownika — owner/deputy może wybrać innego */
+  let workerUid  = currentUser.uid;
+  let workerName = currentProfile?.displayName || currentUser.email;
+  if (isOwnerLevel()) {
+    const sel = document.getElementById('rec-as-worker');
+    const selUid = sel?.value;
+    if (selUid) {
+      const found = receiptWorkers.find(w => w.uid === selUid);
+      if (found) { workerUid = found.uid; workerName = found.displayName; }
+    }
+  }
 
-    // Odejmij produkty z magazynu
-    for (const item of basket) {
-      if (item.isHorse) continue;
-      const cat = CATALOG.find(c => c.id === item.id);
-      if (!cat || cat.cat !== 'Produkty') continue;
-      const wh = warehouseCache.find(w => w.name.toLowerCase() === cat.name.toLowerCase());
-      if (!wh) continue;
-      const newQty = Math.max(0, (wh.qty ?? 0) - item.qty);
-      try {
-        await updateDoc(doc(db,'warehouse',wh.id), { qty: newQty });
-        await addDoc(collection(db,'moves'), {
-          itemId: wh.id, itemName: wh.name,
-          type: 'wydanie', qty: item.qty, newQty,
-          note: 'Sprzedaż — rachunek',
-          userName: currentProfile?.displayName || currentUser.email,
-          userUid:  currentUser.uid,
-          createdAt: serverTimestamp()
-        });
-      } catch(e) { console.warn('Magazyn odejmowanie:', e); }
+  try {
+    if (editingReceiptId) {
+      /* === TRYB EDYCJI — aktualizuj istniejący dokument === */
+      await updateDoc(doc(db, 'receipts', editingReceiptId), {
+        lines, total, stable: half, workerCut: half,
+        client, note, month, week,
+        workerUid, workerName
+        /* createdAt — nie zmieniamy daty utworzenia */
+      });
+      showToast('✓ Rachunek zaktualizowany');
+    } else {
+      /* === TRYB NOWY — dodaj dokument === */
+      await addDoc(collection(db,'receipts'), {
+        lines, total, stable: half, workerCut: half,
+        client, note, month, week,
+        workerUid, workerName,
+        createdAt: serverTimestamp()
+      });
+      showToast('✓ Rachunek zapisany');
+
+      // Odejmij produkty z magazynu (tylko przy nowym rachunku)
+      for (const item of basket) {
+        if (item.isHorse) continue;
+        const cat = CATALOG.find(c => c.id === item.id);
+        if (!cat || cat.cat !== 'Produkty') continue;
+        const wh = warehouseCache.find(w => w.name.toLowerCase() === cat.name.toLowerCase());
+        if (!wh) continue;
+        const newQty = Math.max(0, (wh.qty ?? 0) - item.qty);
+        try {
+          await updateDoc(doc(db,'warehouse',wh.id), { qty: newQty });
+          await addDoc(collection(db,'moves'), {
+            itemId: wh.id, itemName: wh.name,
+            type: 'wydanie', qty: item.qty, newQty,
+            note: 'Sprzedaż — rachunek',
+            userName: workerName,
+            userUid:  workerUid,
+            createdAt: serverTimestamp()
+          });
+        } catch(e) { console.warn('Magazyn odejmowanie:', e); }
+      }
     }
 
     clearReceipt();
@@ -787,6 +828,32 @@ window.addReceiptLine    = function() {};
 window.removeReceiptLine = function() {};
 window.onReceiptItemChange = function() {};
 window.recalcLine        = function() {};
+
+/* =====================================================
+   PRACOWNICY — lista do selecta w formularzu rachunku
+   ===================================================== */
+async function loadReceiptWorkers() {
+  if (!isOwnerLevel()) return;
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    receiptWorkers = [];
+    snap.forEach(d => {
+      const u = d.data();
+      receiptWorkers.push({ uid: d.id, displayName: u.displayName || u.email, role: u.role || 'viewer' });
+    });
+    const sel = document.getElementById('rec-as-worker');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— ja (domyślnie) —</option>';
+    receiptWorkers
+      .filter(u => u.uid !== currentUser?.uid) // pomiń siebie — już jest opcja domyślna
+      .forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.uid;
+        opt.textContent = u.displayName + (ROLES[u.role] ? ' · ' + ROLES[u.role].label : '');
+        sel.appendChild(opt);
+      });
+  } catch(e) { console.warn('loadReceiptWorkers:', e); }
+}
 
 /* =====================================================
    RACHUNKI — historia (filtrowanie w JS, bez indeksu)
@@ -834,6 +901,8 @@ window.loadReceiptsHistory = async function() {
 const CATALOG_ICONS = Object.fromEntries(CATALOG.map(c => [c.id, c.icon]));
 
 window.openReceiptModal = function(r) {
+  _currentReceiptData = r;
+
   /* meta */
   document.getElementById('par-date').textContent   = fmtD(r.createdAt) || '—';
   document.getElementById('par-client').textContent = r.client  || '— brak —';
@@ -870,11 +939,20 @@ window.openReceiptModal = function(r) {
   /* ID */
   document.getElementById('par-id').textContent = 'ID: ' + (r._id || '—');
 
-  /* przycisk usuń tylko dla owner/deputy */
+  /* przycisk usuń i edytuj tylko dla owner/deputy */
   const actEl = document.getElementById('par-actions');
-  actEl.innerHTML = isOwnerLevel()
-    ? `<button class="btn btn-danger" onclick="deleteReceipt('${r._id}');closeReceiptModal()">🗑 Usuń rachunek</button>`
-    : '';
+  if (isOwnerLevel()) {
+    actEl.innerHTML =
+      `<button class="btn btn-primary" style="padding:0.35rem 0.9rem;font-size:0.8rem"
+         onclick="openEditReceiptForm()">✏️ Edytuj rachunek</button>
+       <button class="btn btn-danger" onclick="deleteReceipt('${r._id}');closeReceiptModal()">🗑 Usuń rachunek</button>`;
+  } else {
+    actEl.innerHTML = '';
+  }
+
+  /* Pokaż tryb podglądu (na wypadek powrotu z edycji) */
+  document.getElementById('par-view-content').style.display = '';
+  document.getElementById('par-edit-panel').style.display   = 'none';
 
   document.getElementById('receipt-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -884,6 +962,182 @@ window.closeReceiptModal = function(e) {
   if (e && e.target !== document.getElementById('receipt-modal')) return;
   document.getElementById('receipt-modal').classList.add('hidden');
   document.body.style.overflow = '';
+};
+
+/* =====================================================
+   EDYCJA RACHUNKU W MODALU (owner / deputy)
+   ===================================================== */
+window.openEditReceiptForm = function() {
+  const r = _currentReceiptData;
+  if (!r) return;
+
+  /* Kopia pozycji do edycji */
+  _editLines = (r.lines || []).map(l => ({
+    id:      l.id   || null,
+    name:    l.name || '—',
+    icon:    l.icon || (CATALOG_ICONS[l.id] || '🐴'),
+    price:   parseFloat(l.price)   || 0,
+    qty:     parseInt(l.qty, 10)   || 1,
+    isHorse: !!l.isHorse,
+  }));
+
+  /* Wypełnij pola meta */
+  document.getElementById('par-edit-client').value = r.client || '';
+  document.getElementById('par-edit-note').value   = r.note   || '';
+
+  /* Wypełnij select kasjeraf */
+  const sel = document.getElementById('par-edit-worker');
+  sel.innerHTML = '';
+  receiptWorkers.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.uid;
+    opt.textContent = u.displayName + (ROLES[u.role] ? ' · ' + ROLES[u.role].label : '');
+    sel.appendChild(opt);
+  });
+  if (r.workerUid && !receiptWorkers.find(u => u.uid === r.workerUid)) {
+    const opt = document.createElement('option');
+    opt.value = r.workerUid;
+    opt.textContent = r.workerName || r.workerUid;
+    sel.insertBefore(opt, sel.firstChild);
+  }
+  sel.value = r.workerUid || (receiptWorkers[0]?.uid || '');
+
+  /* Kafelki cennika */
+  const tilesEl = document.getElementById('par-edit-add-tiles');
+  if (tilesEl) {
+    tilesEl.innerHTML = CATALOG.map(c =>
+      `<button class="par-edit-tile" onclick="parEditAddFromCatalog('${c.id}')">
+         ${c.icon} ${c.name} <span class="pet-price">${c.price} $</span>
+       </button>`
+    ).join('');
+  }
+
+  renderParEditLines();
+
+  /* Przełącz panele */
+  document.getElementById('par-view-content').style.display = 'none';
+  document.getElementById('par-edit-panel').style.display   = '';
+};
+
+function renderParEditLines() {
+  const el = document.getElementById('par-edit-lines');
+  if (!_editLines.length) {
+    el.innerHTML = '<div style="font-family:var(--font-type);color:var(--dust);font-size:0.78rem;padding:0.5rem 0;opacity:0.7">Brak pozycji — dodaj z cennika poniżej</div>';
+    parEditRecalc();
+    return;
+  }
+  el.innerHTML = _editLines.map((l, idx) => `
+    <div class="par-edit-row">
+      <div class="par-edit-row-top">
+        <span class="par-edit-row-name">${l.icon} ${l.name}</span>
+        <button class="par-edit-remove" onclick="parEditRemoveLine(${idx})" title="Usuń pozycję">✕</button>
+      </div>
+      <div class="par-edit-row-bottom">
+        <span class="par-edit-row-label">Ilość</span>
+        <div class="basket-qty-ctrl" style="flex-shrink:0">
+          <button onclick="parEditQty(${idx},-1)">−</button>
+          <span>${l.qty}</span>
+          <button onclick="parEditQty(${idx},1)">+</button>
+        </div>
+        <span class="par-edit-row-label" style="margin-left:0.25rem">Cena/szt.</span>
+        <input type="number" step="0.01" min="0"
+          value="${l.price}"
+          class="par-edit-price-input"
+          oninput="parEditPriceChange(${idx},this.value)"/>
+        <span class="par-edit-row-sub" id="par-edit-sub-${idx}">${fmt(l.price * l.qty)}</span>
+      </div>
+    </div>`).join('');
+  parEditRecalc();
+}
+
+window.parEditAddFromCatalog = function(catalogId) {
+  const cat = CATALOG.find(c => c.id === catalogId);
+  if (!cat) return;
+  const existing = _editLines.find(l => l.id === catalogId);
+  if (existing) {
+    existing.qty++;
+  } else {
+    _editLines.push({ id: cat.id, name: cat.name, icon: cat.icon, price: cat.price, qty: 1, isHorse: false });
+  }
+  renderParEditLines();
+};
+
+window.parEditQty = function(idx, delta) {
+  if (!_editLines[idx]) return;
+  const newQty = _editLines[idx].qty + delta;
+  if (newQty <= 0) { _editLines.splice(idx, 1); }
+  else { _editLines[idx].qty = newQty; }
+  renderParEditLines();
+};
+
+window.parEditPriceChange = function(idx, val) {
+  if (!_editLines[idx]) return;
+  const p = parseFloat(val);
+  _editLines[idx].price = isNaN(p) ? 0 : p;
+  const sub = document.getElementById('par-edit-sub-' + idx);
+  if (sub) sub.textContent = fmt(_editLines[idx].price * _editLines[idx].qty);
+  parEditRecalc();
+};
+
+window.parEditRemoveLine = function(idx) {
+  _editLines.splice(idx, 1);
+  renderParEditLines();
+};
+
+function parEditRecalc() {
+  const total = _editLines.reduce((s, l) => s + l.price * l.qty, 0);
+  const half  = total / 2;
+  document.getElementById('par-edit-total').textContent      = fmt(total);
+  document.getElementById('par-edit-stable').textContent     = fmt(half);
+  document.getElementById('par-edit-worker-cut').textContent = fmt(half);
+}
+
+window.saveReceiptEdits = async function() {
+  const r = _currentReceiptData;
+  if (!r?._id) { showToast('⚠ Brak ID rachunku'); return; }
+  if (!_editLines.length) { showToast('⚠ Rachunek musi mieć co najmniej jedną pozycję'); return; }
+
+  const lines = _editLines.map(l => ({
+    id: l.id, name: l.name, icon: l.icon,
+    price: Math.round(l.price * 100) / 100,
+    qty: l.qty,
+    subtotal: Math.round(l.price * l.qty * 100) / 100,
+    isHorse: !!l.isHorse,
+  }));
+  const total = lines.reduce((s, l) => s + l.subtotal, 0);
+  const half  = total / 2;
+
+  /* Kasjer */
+  const sel = document.getElementById('par-edit-worker');
+  const workerUid  = sel.value || r.workerUid;
+  const workerEntry = receiptWorkers.find(u => u.uid === workerUid);
+  const workerName  = workerEntry?.displayName || r.workerName;
+
+  const client = document.getElementById('par-edit-client').value.trim();
+  const note   = document.getElementById('par-edit-note').value.trim();
+
+  try {
+    await updateDoc(doc(db, 'receipts', r._id), {
+      lines, total,
+      stable: Math.round(half * 100) / 100,
+      workerCut: Math.round(half * 100) / 100,
+      client, note,
+      workerUid, workerName,
+    });
+    showToast('✓ Rachunek zaktualizowany');
+    closeReceiptModal();
+    loadReceiptsHistory();
+    loadDashboard();
+    loadPayroll();
+  } catch(e) {
+    console.error('saveReceiptEdits:', e);
+    showToast('❌ ' + e.message);
+  }
+};
+
+window.cancelReceiptEdit = function() {
+  document.getElementById('par-view-content').style.display = '';
+  document.getElementById('par-edit-panel').style.display   = 'none';
 };
 
 window.deleteReceipt = async function(id) {
