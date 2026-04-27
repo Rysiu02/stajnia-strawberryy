@@ -61,12 +61,13 @@ const functions   = getFunctions(firebaseApp, 'europe-west1');
    STAŁE
    ===================================================== */
 const ROLES = {
-  viewer:  { label: 'Obserwator', css: 'role-viewer' },
-  worker:  { label: 'Pracownik',  css: 'role-worker' },
-  deputy:  { label: 'Zastępca',   css: 'role-deputy' },
-  owner:   { label: 'Właściciel', css: 'role-owner'  },
+  viewer:  { label: 'Obserwator', css: 'role-viewer'  },
+  worker:  { label: 'Pracownik',  css: 'role-worker'  },
+  deputy:  { label: 'Zastępca',   css: 'role-deputy'  },
+  technik: { label: 'Technik',    css: 'role-technik' },
+  owner:   { label: 'Właściciel', css: 'role-owner'   },
 };
-const ROLE_LEVEL = { viewer: 0, worker: 1, deputy: 2, owner: 2 };
+const ROLE_LEVEL = { viewer: 0, worker: 1, deputy: 2, technik: 2, owner: 2 };
 
 /* Pozycje cennika — używane i w rachunkach i w magazynie */
 const CATALOG = [
@@ -166,7 +167,7 @@ async function loadUserProfile(uid) {
    POMOCNICZE
    ===================================================== */
 function isOwnerLevel() {
-  return currentRole === 'owner' || currentRole === 'deputy';
+  return currentRole === 'owner' || currentRole === 'deputy' || currentRole === 'technik';
 }
 const fmt  = n => (Math.round((n||0)*100)/100).toLocaleString('pl-PL',
   { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' $';
@@ -1782,10 +1783,11 @@ async function loadAccounts() {
           <select class="form-select" style="padding:0.2rem 0.5rem;font-size:0.7rem;width:auto"
             onchange="changeRole('${d.id}',this.value)"
             ${isSelf?'disabled title="Nie możesz zmienić własnej roli"':''}>
-            <option value="viewer"  ${u.role==='viewer' ?'selected':''}>Obserwator</option>
-            <option value="worker"  ${u.role==='worker' ?'selected':''}>Pracownik</option>
-            <option value="deputy"  ${u.role==='deputy' ?'selected':''}>Zastępca</option>
-            <option value="owner"   ${u.role==='owner'  ?'selected':''}>Właściciel</option>
+            <option value="viewer"  ${u.role==='viewer'  ?'selected':''}>Obserwator</option>
+            <option value="worker"  ${u.role==='worker'  ?'selected':''}>Pracownik</option>
+            <option value="deputy"  ${u.role==='deputy'  ?'selected':''}>Zastępca</option>
+            <option value="technik" ${u.role==='technik' ?'selected':''}>Technik</option>
+            <option value="owner"   ${u.role==='owner'   ?'selected':''}>Właściciel</option>
           </select>
         </td>
         <td>${!isSelf?`<button class="btn btn-danger" style="padding:0.2rem 0.5rem;font-size:0.65rem"
@@ -2018,10 +2020,11 @@ window.deleteNote = async function(id) {
    ===================================================== */
 function roleBadge(role) {
   return ({
-    viewer: '<span class="badge badge-gray">Obserwator</span>',
-    worker: '<span class="badge badge-amber">Pracownik</span>',
-    deputy: '<span class="badge badge-purple">Zastępca</span>',
-    owner:  '<span class="badge badge-red">Właściciel</span>',
+    viewer:  '<span class="badge badge-gray">Obserwator</span>',
+    worker:  '<span class="badge badge-amber">Pracownik</span>',
+    deputy:  '<span class="badge badge-purple">Zastępca</span>',
+    technik: '<span class="badge badge-blue">Technik</span>',
+    owner:   '<span class="badge badge-red">Właściciel</span>',
   })[role] || '<span class="badge badge-gray">—</span>';
 }
 

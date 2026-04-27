@@ -322,10 +322,11 @@ header::before {
   color: var(--dust);
 }
 .user-role-dot { width: 8px; height: 8px; border-radius: 50%; }
-.role-viewer .user-role-dot { background: #4a8c5c; }
-.role-worker .user-role-dot { background: var(--amber); }
-.role-deputy .user-role-dot { background: #7a4abf; }
-.role-owner  .user-role-dot { background: var(--red); }
+.role-viewer  .user-role-dot { background: #4a8c5c; }
+.role-worker  .user-role-dot { background: var(--amber); }
+.role-deputy  .user-role-dot { background: #7a4abf; }
+.role-technik .user-role-dot { background: #1e90c8; box-shadow: 0 0 6px rgba(30,144,200,0.7); }
+.role-owner   .user-role-dot { background: var(--red); }
 
 .logout-btn {
   padding: 0.4rem 0.8rem;
@@ -598,6 +599,7 @@ main {
 .badge-red   { border: 1px solid var(--red); color: #c94040; background: rgba(139,32,32,0.15); }
 .badge-gray   { border: 1px solid rgba(200,176,128,0.3); color: var(--dust); background: rgba(200,176,128,0.08); }
 .badge-purple { border: 1px solid #7a4abf; color: #b07ae8; background: rgba(122,74,191,0.15); }
+.badge-blue   { border: 1px solid #1e90c8; color: #5bbfe8; background: rgba(30,144,200,0.15); }
 
 /* =====================================================
    BUTTONS
