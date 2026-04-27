@@ -197,7 +197,6 @@ function weekLabel(weekStr) {
 function showLogin() {
   document.getElementById('loading-overlay').classList.add('hidden');
   document.getElementById('app').classList.add('hidden');
-  document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('public-screen').classList.remove('hidden');
 
   // Reset przycisku i pól
