@@ -69,7 +69,7 @@ const ROLES = {
 };
 const ROLE_LEVEL = { viewer: 0, worker: 1, deputy: 2, technik: 2, owner: 2 };
 
-/* Pozycje cennika — używane i w rachunkach i w magazynie */
+/* Pozycje cennika — używane w rachunkach */
 const CATALOG = [
   /* === USŁUGI === */
   { id:'trening',     name:'Trening',                  cat:'Usługi',   icon:'🐴',                  img:null,                      price:15,   unit:'szt.' },
@@ -89,11 +89,8 @@ const CATALOG = [
 let currentUser    = null;
 let currentProfile = null;
 let currentRole    = null;
-let warehouseCache = [];
-let editingItemId  = null;
 let editingReceiptId = null;   // ID rachunku w trybie edycji koszyka (null = nowy)
 let receiptWorkers   = [];     // cache pracowników do selecta
-let movingItemId   = null;
 let _currentReceiptData = null; // rachunek aktualnie otwarty w modalu
 let _editLines = [];            // kopia pozycji w trybie edycji modalu
 
@@ -254,7 +251,7 @@ function showApp() {
   document.getElementById('current-month-label').textContent = weekLabel(currentWeek());
 
   const ym = now.toISOString().slice(0,7);
-  ['receipts-filter-month','expenses-filter-month'].forEach(id => {
+  ['receipts-filter-month','expenses-filter-month','deposits-filter-month'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = ym;
   });
@@ -269,11 +266,13 @@ function loadAll() {
   loadDashboard();
   loadReceiptsHistory();
   loadExpenses();
+  loadDeposits();
   loadPayroll();
-  loadWarehouse(); // buildCatalogTiles() wywoływane wewnątrz loadWarehouse
+  buildCatalogTiles();
   loadAccounts();
   loadTax();
   loadNotes();
+  loadInstructions();
   renderBasket();  // inicjalizuj pusty koszyk
   loadReceiptWorkers(); // lista pracowników do selecta w rachunku
 }
@@ -349,13 +348,18 @@ function applyRoleRestrictions() {
   const ep = document.getElementById('add-expense-panel');
   if (ep) ep.style.display = isOwnerLevel() ? 'block' : 'none';
 
+  // Panel wpłat do kasy — tylko owner/deputy
+  const dp = document.getElementById('add-deposit-panel');
+  if (dp) dp.style.display = isOwnerLevel() ? 'block' : 'none';
+
+  // Panel dodawania instrukcji — tylko owner/deputy/technik
+  const ip = document.getElementById('add-instruction-panel');
+  if (ip) ip.style.display = isOwnerLevel() ? 'block' : 'none';
+
   // Select pracownika w formularzu rachunku — tylko owner/deputy
   const recWorkerWrap = document.getElementById('rec-as-worker-wrap');
   if (recWorkerWrap) recWorkerWrap.style.display = isOwnerLevel() ? 'block' : 'none';
 
-  // Przycisk nowej pozycji w magazynie — nie dla viewera
-  const addWhBtn = document.querySelector('#section-warehouse .page-header .btn');
-  if (addWhBtn) addWhBtn.style.display = lvl >= ROLE_LEVEL['worker'] ? 'inline-block' : 'none';
 }
 
 /* =====================================================
@@ -409,13 +413,27 @@ async function loadDashboard() {
       if (e.month === month) totalExp += e.amount || 0;
     });
 
-    /* Stan kasy stajni = 100% wpływów ze wszystkich rachunków − wszystkie wydatki − wszystkie wypłaty */
-    const treasury = allTimeTotal - allTimeExp - allTimePaid;
+    /* Wpłaty do kasy */
+    let allTimeDeposits = 0, weekDeposits = 0;
+    try {
+      const dSnap = await getDocs(collection(db,'deposits'));
+      dSnap.forEach(d => {
+        const dep = d.data();
+        allTimeDeposits += dep.amount || 0;
+        const depWeek = dep.week || dateToWeek(dep.createdAt);
+        if (depWeek === week) weekDeposits += dep.amount || 0;
+      });
+    } catch(_) { /* kolekcja jeszcze nie istnieje */ }
+
+    /* Stan kasy stajni = 100% wpływów + wpłaty do kasy − wydatki − wypłaty */
+    const treasury = allTimeTotal + allTimeDeposits - allTimeExp - allTimePaid;
 
     document.getElementById('stat-today').textContent       = fmt(totalSales);
     document.getElementById('stat-stable').textContent      = fmt(totalStable);
     document.getElementById('stat-workers-tab').textContent = fmt(totalWorkers);
     document.getElementById('stat-expenses').textContent    = fmt(totalExp);
+    const depEl = document.getElementById('stat-deposits');
+    if (depEl) depEl.textContent = fmt(weekDeposits);
     const tEl = document.getElementById('stat-treasury');
     if (tEl) {
       tEl.textContent = fmt(treasury);
@@ -460,7 +478,7 @@ async function loadDashboard() {
 let basket = [];
 let pendingHorse = null; // nieużywane, zachowane dla kompatybilności
 
-/* Buduje kafelki przy starcie i po odświeżeniu magazynu */
+/* Buduje kafelki przy starcie */
 function buildCatalogTiles() {
   renderTiles('tiles-uslugi',  CATALOG.filter(c => c.cat === 'Usługi'));
   renderTiles('tiles-produkty', CATALOG.filter(c => c.cat === 'Produkty'));
@@ -471,28 +489,18 @@ function renderTiles(containerId, items) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = items.map(item => {
-    const whItem   = warehouseCache.find(w => w.name.toLowerCase() === item.name.toLowerCase());
-    const hasStock = !whItem || (whItem.qty ?? 0) > 0;
-    const isProduct = item.cat === 'Produkty';
-    const qty      = whItem ? (whItem.qty ?? 0) : null;
-    const blocked  = isProduct && whItem && !hasStock;
-
     /* Ikona — obrazek jeśli dostępny, fallback na emoji */
     const iconHtml = item.img
       ? `<img src="${item.img}" class="catalog-tile-img" alt="${item.name}" onerror="this.style.display='none';this.nextSibling.style.display='block'"/><span class="catalog-tile-emoji" style="display:none">${item.icon}</span>`
       : `<span class="catalog-tile-emoji">${item.icon}</span>`;
 
     return `
-      <div class="catalog-tile ${blocked ? 'catalog-tile-blocked' : ''}"
-        onclick="${blocked ? '' : `addToBasket('${item.id}')`}"
-        title="${blocked ? 'Brak w magazynie' : item.name + ' — ' + item.price + '$'}">
+      <div class="catalog-tile"
+        onclick="addToBasket('${item.id}')"
+        title="${item.name + ' — ' + item.price + '$'}">
         <div class="catalog-tile-icon">${iconHtml}</div>
         <div class="catalog-tile-name">${item.name}</div>
         <div class="catalog-tile-price">${item.price.toLocaleString('pl-PL', {minimumFractionDigits: item.price % 1 ? 2 : 0})} $</div>
-        ${isProduct && whItem ? `<div class="catalog-tile-stock ${!hasStock ? 'out' : qty <= (whItem.threshold??5) ? 'low' : ''}">
-          ${!hasStock ? '⛔ Brak' : 'Stan: ' + qty + ' ' + (whItem.unit||'szt.')}
-        </div>` : ''}
-        ${blocked ? '<div class="catalog-tile-overlay">BRAK</div>' : ''}
       </div>`;
   }).join('');
 }
@@ -533,26 +541,9 @@ window.addToBasket = function(itemId) {
   const item = CATALOG.find(c => c.id === itemId);
   if (!item) return;
 
-  // Sprawdź stan magazynowy dla produktów
-  if (item.cat === 'Produkty') {
-    const whItem = warehouseCache.find(w => w.name.toLowerCase() === item.name.toLowerCase());
-    if (whItem && (whItem.qty ?? 0) <= 0) {
-      showToast('⛔ Brak w magazynie: ' + item.name);
-      return;
-    }
-  }
-
   // Jeśli już w koszyku — zwiększ ilość
   const existing = basket.find(b => b.id === itemId);
   if (existing) {
-    // Sprawdź limit magazynowy
-    if (item.cat === 'Produkty') {
-      const whItem = warehouseCache.find(w => w.name.toLowerCase() === item.name.toLowerCase());
-      if (whItem && existing.qty >= (whItem.qty ?? 0)) {
-        showToast('⚠ Maksymalna dostępna ilość: ' + whItem.qty + ' ' + (whItem.unit||'szt.'));
-        return;
-      }
-    }
     existing.qty++;
   } else {
     basket.push({ id: itemId, name: item.name, icon: item.icon, img: item.img || null, price: item.price, qty: 1, isHorse: false });
@@ -604,17 +595,6 @@ window.changeQty = function(idx, delta) {
   if (!item) return;
   const newQty = item.qty + delta;
   if (newQty <= 0) { basket.splice(idx, 1); renderBasket(); return; }
-
-  // Limit magazynowy
-  if (!item.isHorse) {
-    const cat = CATALOG.find(c => c.id === item.id);
-    if (cat?.cat === 'Produkty') {
-      const wh = warehouseCache.find(w => w.name.toLowerCase() === cat.name.toLowerCase());
-      if (wh && newQty > (wh.qty ?? 0)) {
-        showToast('⚠ Max: ' + wh.qty + ' ' + (wh.unit||'szt.')); return;
-      }
-    }
-  }
   item.qty = newQty;
   renderBasket();
 };
@@ -789,35 +769,13 @@ window.saveReceipt = async function() {
         createdAt: serverTimestamp()
       });
       showToast('✓ Rachunek zapisany');
-
-      // Odejmij produkty z magazynu (tylko przy nowym rachunku)
-      for (const item of basket) {
-        if (item.isHorse) continue;
-        const cat = CATALOG.find(c => c.id === item.id);
-        if (!cat || cat.cat !== 'Produkty') continue;
-        const wh = warehouseCache.find(w => w.name.toLowerCase() === cat.name.toLowerCase());
-        if (!wh) continue;
-        const newQty = Math.max(0, (wh.qty ?? 0) - item.qty);
-        try {
-          await updateDoc(doc(db,'warehouse',wh.id), { qty: newQty });
-          await addDoc(collection(db,'moves'), {
-            itemId: wh.id, itemName: wh.name,
-            type: 'wydanie', qty: item.qty, newQty,
-            note: 'Sprzedaż — rachunek',
-            userName: workerName,
-            userUid:  workerUid,
-            createdAt: serverTimestamp()
-          });
-        } catch(e) { console.warn('Magazyn odejmowanie:', e); }
-      }
     }
 
     clearReceipt();
     loadDashboard();
     loadReceiptsHistory();
-    loadWarehouse();
     loadPayroll();        // odśwież wypłaty — nowy rachunek wpływa na zakładki
-    buildCatalogTiles();  // odśwież kafelki po zmianie stanu
+    buildCatalogTiles();
   } catch(e) {
     console.error('saveReceipt:', e);
     showToast('❌ ' + e.message);
@@ -1147,6 +1105,69 @@ window.deleteReceipt = async function(id) {
     await deleteDoc(doc(db,'receipts',id));
     showToast('✓ Rachunek usunięty');
     loadReceiptsHistory(); loadDashboard();
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+/* =====================================================
+   WPŁATY DO KASY
+   ===================================================== */
+window.loadDeposits = async function() {
+  const month = document.getElementById('deposits-filter-month')?.value || currentMonth();
+  const tbody = document.getElementById('deposits-body');
+  if (!tbody) return;
+  try {
+    const snap = await getDocs(collection(db,'deposits'));
+    let rows = [];
+    snap.forEach(d => {
+      const dep = d.data();
+      if (dep.month === month) rows.push({ ...dep, _id: d.id });
+    });
+    rows.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Brak wpłat w tym miesiącu</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(dep => `
+      <tr>
+        <td class="muted">${fmtD(dep.createdAt)}</td>
+        <td>${dep.who||'—'}</td>
+        <td>${dep.description||'—'}</td>
+        <td><strong style="color:#6abf7e">${fmt(dep.amount)}</strong></td>
+        <td>${isOwnerLevel() ? `<button class="btn btn-danger" style="padding:0.2rem 0.4rem;font-size:0.65rem"
+          onclick="deleteDeposit('${dep._id}')">Usuń</button>` : ''}</td>
+      </tr>`).join('');
+  } catch(e) { console.error('Deposits:', e); }
+};
+
+window.saveDeposit = async function() {
+  const who    = document.getElementById('dep-who').value.trim();
+  const amount = parseFloat(document.getElementById('dep-amount').value);
+  const desc   = document.getElementById('dep-desc').value.trim();
+  const month  = currentMonth();
+  const week   = currentWeek();
+  if (!who || !amount || !desc) { showToast('⚠ Wypełnij wszystkie pola'); return; }
+  if (amount <= 0) { showToast('⚠ Kwota musi być większa od 0'); return; }
+  try {
+    await addDoc(collection(db,'deposits'), {
+      who, amount, description: desc, month, week,
+      createdBy: currentUser.uid,
+      createdByName: currentProfile?.displayName || currentUser.email,
+      createdAt: serverTimestamp()
+    });
+    showToast('✓ Wpłata zapisana');
+    document.getElementById('dep-who').value    = '';
+    document.getElementById('dep-amount').value = '';
+    document.getElementById('dep-desc').value   = '';
+    loadDeposits(); loadDashboard(); loadTax();
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+window.deleteDeposit = async function(id) {
+  if (!await showConfirm('Usunąć wpłatę?', 'Usuń')) return;
+  try {
+    await deleteDoc(doc(db,'deposits',id));
+    showToast('✓ Usunięto'); loadDeposits(); loadDashboard(); loadTax();
   } catch(e) { showToast('❌ ' + e.message); }
 };
 
@@ -1566,6 +1587,16 @@ window.loadTax = async function() {
       if (rWeek === selWeek) income += r.total || 0;
     });
 
+    /* Wpłaty do kasy w tym tygodniu — dodajemy do przychodu */
+    try {
+      const depSnap = await getDocs(collection(db,'deposits'));
+      depSnap.forEach(d => {
+        const dep     = d.data();
+        const depWeek = dep.week || dateToWeek(dep.createdAt);
+        if (depWeek === selWeek) income += dep.amount || 0;
+      });
+    } catch(_) { /* kolekcja jeszcze nie istnieje */ }
+
     const eSnap = await getDocs(collection(db,'expenses'));
     let expenses = 0;
     eSnap.forEach(d => {
@@ -1594,163 +1625,6 @@ window.saveTaxRate = async function() {
   try {
     await setDoc(doc(db,'settings','tax'), { rate, updatedAt: serverTimestamp() });
     showToast('✓ Stawka: ' + rate + '%'); loadTax();
-  } catch(e) { showToast('❌ ' + e.message); }
-};
-
-/* =====================================================
-   MAGAZYN
-   ===================================================== */
-async function loadWarehouse() {
-  try {
-    const snap = await getDocs(collection(db,'warehouse'));
-    warehouseCache = [];
-    snap.forEach(d => warehouseCache.push({ id: d.id, ...d.data() }));
-    warehouseCache.sort((a,b) => a.name.localeCompare(b.name,'pl'));
-    renderWarehouse(warehouseCache);
-    buildCatalogTiles(); // odśwież kafelki stanu magazynowego
-  } catch(e) { console.error('Warehouse:', e); }
-}
-
-function renderWarehouse(items) {
-  const tbody = document.getElementById('warehouse-body');
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Magazyn jest pusty</td></tr>';
-    return;
-  }
-  tbody.innerHTML = items.map(item => {
-    const low = (item.qty??0) <= (item.threshold??5);
-    return `<tr>
-      <td>${item.icon||'📦'} ${item.name}</td>
-      <td><strong style="color:${low?'#c94040':'var(--pale-gold)'}">${item.qty??0}</strong>
-        ${low ? '<span class="badge badge-red" style="margin-left:0.4rem">Niski</span>' : ''}
-      </td>
-      <td class="muted">${item.unit||'szt.'}</td>
-      <td class="muted">${item.threshold??5}</td>
-      <td style="display:flex;gap:0.4rem;flex-wrap:wrap">
-        <button class="btn btn-primary" style="padding:0.2rem 0.5rem;font-size:0.65rem"
-          onclick="openMovePanel('${item.id}','${item.name}')">± Ruch</button>
-        <button class="btn btn-ghost" style="padding:0.2rem 0.5rem;font-size:0.65rem"
-          onclick="openEditItem('${item.id}')">Edytuj</button>
-        ${isOwnerLevel() ? `<button class="btn btn-danger" style="padding:0.2rem 0.5rem;font-size:0.65rem"
-          onclick="deleteItem('${item.id}')">Usuń</button>` : ''}
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-window.filterWarehouse = q =>
-  renderWarehouse(warehouseCache.filter(i => i.name.toLowerCase().includes(q.toLowerCase())));
-
-window.showAddItemModal = function() {
-  editingItemId = null;
-  document.getElementById('warehouse-modal-title').textContent = 'Nowa pozycja';
-
-  /* Wypełnij select z CATALOG */
-  const sel = document.getElementById('wh-catalog-sel');
-  if (sel) {
-    sel.innerHTML = '<option value="">— własna —</option>';
-    const groups = {};
-    CATALOG.forEach(c => {
-      if (!groups[c.cat]) groups[c.cat] = [];
-      groups[c.cat].push(c);
-    });
-    Object.entries(groups).forEach(([cat, items]) => {
-      sel.innerHTML += `<optgroup label="${cat}">${items.map(c =>
-        `<option value="${c.id}" data-icon="${c.icon}" data-unit="${c.unit}">${c.icon} ${c.name}</option>`
-      ).join('')}</optgroup>`;
-    });
-  }
-
-  ['wh-name','wh-icon','wh-unit'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('wh-qty').value       = 0;
-  document.getElementById('wh-threshold').value = 5;
-  document.getElementById('warehouse-modal').classList.remove('hidden');
-};
-
-window.onCatalogSelect = function(sel) {
-  const opt = sel.selectedOptions[0];
-  if (!opt || !opt.value) return;
-  const found = CATALOG.find(c => c.id === opt.value);
-  if (!found) return;
-  document.getElementById('wh-name').value = found.name;
-  document.getElementById('wh-icon').value = found.icon;
-  document.getElementById('wh-unit').value = found.unit;
-};
-
-window.openEditItem = function(id) {
-  const item = warehouseCache.find(i => i.id === id);
-  if (!item) return;
-  editingItemId = id;
-  document.getElementById('warehouse-modal-title').textContent = 'Edytuj: ' + item.name;
-  document.getElementById('wh-name').value      = item.name      || '';
-  document.getElementById('wh-icon').value      = item.icon      || '';
-  document.getElementById('wh-qty').value       = item.qty       ?? 0;
-  document.getElementById('wh-unit').value      = item.unit      || '';
-  document.getElementById('wh-threshold').value = item.threshold ?? 5;
-  document.getElementById('warehouse-modal').classList.remove('hidden');
-};
-
-window.closeItemModal = function() {
-  document.getElementById('warehouse-modal').classList.add('hidden');
-  editingItemId = null;
-};
-
-window.saveWarehouseItem = async function() {
-  const name      = document.getElementById('wh-name').value.trim();
-  const icon      = document.getElementById('wh-icon').value.trim() || '📦';
-  const qty       = parseFloat(document.getElementById('wh-qty').value) || 0;
-  const unit      = document.getElementById('wh-unit').value.trim()  || 'szt.';
-  const threshold = parseFloat(document.getElementById('wh-threshold').value) || 5;
-  if (!name) { showToast('⚠ Podaj nazwę'); return; }
-  try {
-    if (editingItemId) {
-      await updateDoc(doc(db,'warehouse',editingItemId), { name, icon, qty, unit, threshold });
-    } else {
-      await addDoc(collection(db,'warehouse'), { name, icon, qty, unit, threshold, createdAt: serverTimestamp() });
-    }
-    showToast('✓ Zapisano'); closeItemModal(); loadWarehouse();
-  } catch(e) { showToast('❌ ' + e.message); }
-};
-
-window.deleteItem = async function(id) {
-  if (!await showConfirm('Usunąć pozycję?', 'Usuń')) return;
-  try {
-    await deleteDoc(doc(db,'warehouse',id));
-    showToast('✓ Usunięto'); loadWarehouse();
-  } catch(e) { showToast('❌ ' + e.message); }
-};
-
-window.openMovePanel = function(id, name) {
-  movingItemId = id;
-  document.getElementById('move-panel-title').textContent = 'Ruch: ' + name;
-  document.getElementById('move-qty').value  = '';
-  document.getElementById('move-note').value = '';
-  document.getElementById('move-panel').style.display = 'block';
-  document.getElementById('move-panel').scrollIntoView({ behavior:'smooth' });
-};
-window.closeMovePanel = function() {
-  document.getElementById('move-panel').style.display = 'none';
-  movingItemId = null;
-};
-window.saveMove = async function() {
-  const type = document.getElementById('move-type').value;
-  const qty  = parseFloat(document.getElementById('move-qty').value);
-  const note = document.getElementById('move-note').value.trim();
-  if (!qty||qty<=0) { showToast('⚠ Podaj ilość'); return; }
-  const item = warehouseCache.find(i => i.id === movingItemId);
-  if (!item) return;
-  let newQty = item.qty ?? 0;
-  if      (type==='przyjecie') newQty += qty;
-  else if (type==='wydanie')   newQty  = Math.max(0,newQty-qty);
-  else                         newQty  = qty;
-  try {
-    await updateDoc(doc(db,'warehouse',movingItemId), { qty: newQty });
-    await addDoc(collection(db,'moves'), {
-      itemId: movingItemId, itemName: item.name, type, qty, newQty, note,
-      userName: currentProfile?.displayName||currentUser.email,
-      userUid: currentUser.uid, createdAt: serverTimestamp()
-    });
-    showToast('✓ Ruch zapisany'); closeMovePanel(); loadWarehouse();
   } catch(e) { showToast('❌ ' + e.message); }
 };
 
@@ -1941,6 +1815,106 @@ window.fireEmployee = async function(uid, name) {
       console.error('fireEmployee:', e);
     }
   }
+};
+
+/* =====================================================
+   INSTRUKCJE
+   ===================================================== */
+let _instrCache = [];   // lokalny cache do filtrowania
+let _instrFilter = '';  // aktywna kategoria filtru
+
+async function loadInstructions() {
+  const el = document.getElementById('instructions-list');
+  if (!el) return;
+  if (ROLE_LEVEL[currentRole] < ROLE_LEVEL['worker']) {
+    el.innerHTML = `<div class="access-denied">
+      <div class="access-denied-icon">🔒</div>
+      <div class="access-denied-text">Instrukcje widoczne tylko dla pracowników i kierownictwa</div>
+    </div>`; return;
+  }
+  try {
+    const snap = await getDocs(query(collection(db,'instructions'), orderBy('createdAt','desc')));
+    _instrCache = [];
+    snap.forEach(d => _instrCache.push({ _id: d.id, ...d.data() }));
+    renderInstructions(_instrCache);
+  } catch(e) { console.error('Instructions:', e); }
+}
+
+function renderInstructions(list) {
+  const el = document.getElementById('instructions-list');
+  if (!el) return;
+  const filtered = _instrFilter ? list.filter(i => i.category === _instrFilter) : list;
+  if (!filtered.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2.5rem;font-family:var(--font-type);color:var(--dust);opacity:0.6">📖 Brak instrukcji.</div>';
+    return;
+  }
+  const catLabels = {
+    ogolna:          'Ogólna',
+    bezpieczenstwo:  'Bezpieczeństwo',
+    procedura:       'Procedura',
+    obowiazki:       'Obowiązki',
+    inne:            'Inne',
+  };
+  el.innerHTML = '';
+  filtered.forEach(n => {
+    const cat     = n.category || 'ogolna';
+    const catLbl  = catLabels[cat] || cat;
+    const canDel  = isOwnerLevel();
+    el.innerHTML += `<div class="instr-card instr-${cat}">
+      <div class="instr-card-header">
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+          <span class="instr-cat-badge">${catLbl}</span>
+          <strong class="instr-title">${n.title||'—'}</strong>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-shrink:0">
+          <span class="instr-meta">${n.authorName||'—'} · ${fmtD(n.createdAt)}</span>
+          ${canDel ? `<button class="btn btn-danger" style="padding:0.2rem 0.5rem;font-size:0.65rem"
+            onclick="deleteInstruction('${n._id}')">Usuń</button>` : ''}
+        </div>
+      </div>
+      <div class="instr-body">${(n.body||'').replace(/\n/g,'<br>')}</div>
+    </div>`;
+  });
+}
+
+window.filterInstructions = function(btn, cat) {
+  _instrFilter = cat;
+  document.querySelectorAll('.instr-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderInstructions(_instrCache);
+};
+
+window.saveInstruction = async function() {
+  const title    = document.getElementById('instr-title').value.trim();
+  const body     = document.getElementById('instr-body').value.trim();
+  const category = document.getElementById('instr-category').value;
+  if (!title || !body) { showToast('⚠ Wypełnij tytuł i treść'); return; }
+  try {
+    await addDoc(collection(db,'instructions'), {
+      title, body, category,
+      authorUid:  currentUser.uid,
+      authorName: currentProfile?.displayName || currentUser.email,
+      createdAt:  serverTimestamp()
+    });
+    showToast('✓ Instrukcja opublikowana');
+    clearInstructionForm();
+    loadInstructions();
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+window.clearInstructionForm = function() {
+  document.getElementById('instr-title').value    = '';
+  document.getElementById('instr-body').value     = '';
+  document.getElementById('instr-category').value = 'ogolna';
+};
+
+window.deleteInstruction = async function(id) {
+  if (!await showConfirm('Usunąć tę instrukcję?', 'Usuń')) return;
+  try {
+    await deleteDoc(doc(db,'instructions', id));
+    showToast('✓ Usunięto');
+    loadInstructions();
+  } catch(e) { showToast('❌ ' + e.message); }
 };
 
 /* =====================================================

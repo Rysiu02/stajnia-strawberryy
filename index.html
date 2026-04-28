@@ -99,17 +99,10 @@
       <span class="nav-icon">💰</span> Wypłaty
     </div>
     <div class="nav-item" onclick="goTo('expenses',this)">
-      <span class="nav-icon">📤</span> Wydatki
+      <span class="nav-icon">�</span> Finanse
     </div>
     <div class="nav-item" onclick="goTo('tax',this)">
       <span class="nav-icon">📑</span> Podatek
-    </div>
-
-    <div class="nav-divider"></div>
-    <div class="nav-section-label">Magazyn</div>
-
-    <div class="nav-item" onclick="goTo('warehouse',this)" data-min-role="worker">
-      <span class="nav-icon">🏚️</span> Magazyn
     </div>
 
     <div class="nav-divider"></div>
@@ -117,6 +110,9 @@
 
     <div class="nav-item" onclick="goTo('notes',this)" data-min-role="worker">
       <span class="nav-icon">📌</span> Notatki
+    </div>
+    <div class="nav-item" onclick="goTo('instructions',this)" data-min-role="worker">
+      <span class="nav-icon">📖</span> Instrukcje
     </div>
 
     <div class="nav-divider"></div>
@@ -170,11 +166,17 @@
           <div class="stat-card-value" id="stat-expenses">—</div>
           <div class="stat-card-change neg">zatwierdzone przez właściciela</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">💵</div>
+          <div class="stat-card-label">Wpłaty do kasy (tydzień)</div>
+          <div class="stat-card-value" id="stat-deposits">—</div>
+          <div class="stat-card-change pos">gotówka spoza rachunków</div>
+        </div>
         <div class="stat-card stat-card--treasury">
           <div class="stat-card-icon">💵</div>
           <div class="stat-card-label">Stan kasy stajni</div>
           <div class="stat-card-value" id="stat-treasury">—</div>
-          <div class="stat-card-change">50% sprzedaży − wydatki − wypłaty</div>
+          <div class="stat-card-change">przychód + wpłaty − wydatki − wypłaty</div>
         </div>
       </div>
 
@@ -414,12 +416,56 @@
       </div>
     </section>
 
-    <!-- ===== WYDATKI ===== -->
+    <!-- ===== FINANSE ===== -->
     <section class="page-section" id="section-expenses">
       <div class="page-header">
         <div>
-          <div class="page-title">Wydatki</div>
-          <div class="page-subtitle">Na co wyciągnięto pieniądze ze stajni</div>
+          <div class="page-title">Finanse</div>
+          <div class="page-subtitle">Wpłaty do kasy · Wydatki stajni</div>
+        </div>
+      </div>
+
+      <!-- Wpłata do kasy — tylko właściciel -->
+      <div class="panel" id="add-deposit-panel" style="display:none">
+        <div class="panel-header"><div class="panel-title">💵 Zarejestruj Wpłatę do Kasy</div></div>
+        <div class="panel-body">
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label>Od kogo / źródło</label>
+              <input class="form-input" id="dep-who" type="text" placeholder="Imię klienta, opis..."/>
+            </div>
+            <div class="form-group">
+              <label>Kwota ($)</label>
+              <input class="form-input" id="dep-amount" type="number" min="0" step="0.5" placeholder="0"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Za co / opis</label>
+              <input class="form-input" id="dep-desc" type="text" placeholder="Opis wpłaty..."/>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem">
+            <button class="btn btn-primary" onclick="saveDeposit()">Zapisz wpłatę</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historia wpłat -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">💵 Historia Wpłat do Kasy</div>
+          <input class="form-input" id="deposits-filter-month" type="month"
+            style="padding:0.3rem 0.6rem;font-size:0.75rem;width:160px"
+            onchange="loadDeposits()"/>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <table class="western-table">
+            <thead>
+              <tr><th>Data</th><th>Od kogo</th><th>Opis</th><th>Kwota</th><th></th></tr>
+            </thead>
+            <tbody id="deposits-body">
+              <tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -531,114 +577,6 @@
       </div>
     </section>
 
-    <!-- ===== MAGAZYN ===== -->
-    <section class="page-section" id="section-warehouse">
-      <div class="page-header">
-        <div>
-          <div class="page-title">Magazyn</div>
-          <div class="page-subtitle">Stany · Przyjęcia · Wydania</div>
-        </div>
-        <button class="btn btn-primary" onclick="showAddItemModal()">+ Nowa pozycja</button>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">🏚️ Stany Bieżące</div>
-          <input class="form-input" id="warehouse-search"
-            style="width:200px;padding:0.35rem 0.7rem;font-size:0.75rem"
-            placeholder="Szukaj..." oninput="filterWarehouse(this.value)"/>
-        </div>
-        <div class="panel-body" style="padding:0">
-          <table class="western-table" id="warehouse-table">
-            <thead>
-              <tr><th>Pozycja</th><th>Stan</th><th>Jednostka</th><th>Próg alertu</th><th>Akcje</th></tr>
-            </thead>
-            <tbody id="warehouse-body">
-              <tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Modal dodawania/edycji pozycji -->
-      <div id="warehouse-modal" class="modal-overlay hidden">
-        <div class="modal-box">
-          <div class="modal-header">
-            <div class="panel-title" id="warehouse-modal-title">Nowa pozycja</div>
-            <button class="btn btn-ghost" style="padding:0.2rem 0.5rem" onclick="closeItemModal()">✕</button>
-          </div>
-          <div class="modal-body">
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Wybierz z katalogu (opcjonalnie)</label>
-                <select class="form-select" id="wh-catalog-sel" onchange="onCatalogSelect(this)">
-                  <option value="">— własna pozycja —</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Nazwa</label>
-                <input class="form-input" id="wh-name" type="text" placeholder="np. Pasza"/>
-              </div>
-              <div class="form-group">
-                <label>Ikona (emoji)</label>
-                <input class="form-input" id="wh-icon" type="text" placeholder="🌾" maxlength="4"/>
-              </div>
-              <div class="form-grid form-grid-2">
-                <div class="form-group">
-                  <label>Ilość początkowa</label>
-                  <input class="form-input" id="wh-qty" type="number" min="0" placeholder="0"/>
-                </div>
-                <div class="form-group">
-                  <label>Jednostka</label>
-                  <input class="form-input" id="wh-unit" type="text" placeholder="kg / szt. / l"/>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Próg alertu (niski stan)</label>
-                <input class="form-input" id="wh-threshold" type="number" min="0" placeholder="5"/>
-              </div>
-            </div>
-            <div style="margin-top:1rem;display:flex;gap:0.75rem">
-              <button class="btn btn-primary" onclick="saveWarehouseItem()">Zapisz</button>
-              <button class="btn btn-ghost"   onclick="closeItemModal()">Anuluj</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Panel ruchów -->
-      <div class="panel" id="move-panel" style="display:none">
-        <div class="panel-header">
-          <div class="panel-title" id="move-panel-title">Ruch magazynowy</div>
-          <button class="btn btn-ghost" style="padding:0.2rem 0.5rem" onclick="closeMovePanel()">✕</button>
-        </div>
-        <div class="panel-body">
-          <div class="form-grid form-grid-2">
-            <div class="form-group">
-              <label>Typ</label>
-              <select class="form-select" id="move-type">
-                <option value="przyjecie">Przyjęcie</option>
-                <option value="wydanie">Wydanie</option>
-                <option value="korekta">Korekta stanu</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Ilość</label>
-              <input class="form-input" id="move-qty" type="number" min="1" placeholder="0"/>
-            </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label>Uwagi</label>
-              <input class="form-input" id="move-note" type="text" placeholder="Opcjonalne..."/>
-            </div>
-          </div>
-          <div style="margin-top:1rem;display:flex;gap:0.75rem">
-            <button class="btn btn-primary" onclick="saveMove()">Zapisz ruch</button>
-            <button class="btn btn-ghost"   onclick="closeMovePanel()">Anuluj</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- ===== KONTA ===== -->
     <section class="page-section" id="section-accounts">
       <div class="page-header">
@@ -694,6 +632,62 @@
       <!-- Lista kont -->
       <div id="accounts-content">
         <div style="font-family:var(--font-type);color:var(--dust);padding:1rem">&#321;adowanie...</div>
+      </div>
+    </section>
+
+    <!-- ===== INSTRUKCJE ===== -->
+    <section class="page-section" id="section-instructions">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Instrukcje</div>
+          <div class="page-subtitle">Procedury i wytyczne od kierownictwa</div>
+        </div>
+      </div>
+
+      <!-- Formularz dodawania — tylko owner/deputy/technik -->
+      <div class="panel" id="add-instruction-panel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title">📖 Nowa Instrukcja</div>
+          <select class="form-select" id="instr-category" style="padding:0.3rem 0.6rem;font-size:0.75rem;width:auto">
+            <option value="ogolna">Ogólna</option>
+            <option value="bezpieczenstwo">Bezpieczeństwo</option>
+            <option value="procedura">Procedura</option>
+            <option value="obowiazki">Obowiązki</option>
+            <option value="inne">Inne</option>
+          </select>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Tytuł</label>
+              <input class="form-input" id="instr-title" type="text" placeholder="Nazwa instrukcji lub procedury..."/>
+            </div>
+            <div class="form-group">
+              <label>Treść</label>
+              <textarea class="form-textarea" id="instr-body" rows="6" placeholder="Szczegółowy opis, kroki do wykonania..."></textarea>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem">
+            <button class="btn btn-primary" onclick="saveInstruction()">&#128214; Opublikuj instrukcję</button>
+            <button class="btn btn-ghost" onclick="clearInstructionForm()">Wyczyść</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtry -->
+      <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+        <span style="font-family:var(--font-type);font-size:0.72rem;color:var(--dust)">Filtruj:</span>
+        <button class="btn btn-ghost instr-filter-btn active" data-cat="" onclick="filterInstructions(this,'')">★ Wszystkie</button>
+        <button class="btn btn-ghost instr-filter-btn" data-cat="ogolna" onclick="filterInstructions(this,'ogolna')">Ogólne</button>
+        <button class="btn btn-ghost instr-filter-btn" data-cat="bezpieczenstwo" onclick="filterInstructions(this,'bezpieczenstwo')">Bezpieczeństwo</button>
+        <button class="btn btn-ghost instr-filter-btn" data-cat="procedura" onclick="filterInstructions(this,'procedura')">Procedury</button>
+        <button class="btn btn-ghost instr-filter-btn" data-cat="obowiazki" onclick="filterInstructions(this,'obowiazki')">Obowiązki</button>
+        <button class="btn btn-ghost instr-filter-btn" data-cat="inne" onclick="filterInstructions(this,'inne')">Inne</button>
+      </div>
+
+      <!-- Lista instrukcji -->
+      <div id="instructions-list">
+        <div style="font-family:var(--font-type);color:var(--dust);padding:1rem">Wczytywanie...</div>
       </div>
     </section>
 
