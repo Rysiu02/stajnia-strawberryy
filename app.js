@@ -431,9 +431,12 @@ async function loadDashboard() {
     document.getElementById('stat-today').textContent       = fmt(totalSales);
     document.getElementById('stat-stable').textContent      = fmt(totalStable);
     document.getElementById('stat-workers-tab').textContent = fmt(totalWorkers);
-    document.getElementById('stat-expenses').textContent    = fmt(totalExp);
-    const depEl = document.getElementById('stat-deposits');
-    if (depEl) depEl.textContent = fmt(weekDeposits);
+    const financeNet = allTimeDeposits - allTimeExp;
+    const finEl = document.getElementById('stat-finance');
+    if (finEl) {
+      finEl.textContent = fmt(financeNet);
+      finEl.style.color = financeNet >= 0 ? '#6abf7e' : '#c94040';
+    }
     const tEl = document.getElementById('stat-treasury');
     if (tEl) {
       tEl.textContent = fmt(treasury);
