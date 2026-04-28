@@ -328,7 +328,26 @@ window.goTo = function(section, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + section)?.classList.add('active');
   el?.classList.add('active');
+  /* Oznacz jako przeczytane — usuń badge powiadomienia */
+  if (section === 'notes' || section === 'instructions') {
+    localStorage.setItem('lastSeen_' + section, Date.now().toString());
+    el?.querySelectorAll('.notif-badge').forEach(b => b.remove());
+  }
 };
+
+/* Wyświetla/usuwa czerwony badge powiadomienia na elemencie menu */
+function updateNotifBadge(section, newestMs) {
+  const navEl = document.querySelector(`.nav-item[onclick*="'${section}'"]`);
+  if (!navEl) return;
+  navEl.querySelectorAll('.notif-badge').forEach(b => b.remove());
+  const lastSeen = parseInt(localStorage.getItem('lastSeen_' + section) || '0');
+  if (newestMs > lastSeen) {
+    const badge = document.createElement('span');
+    badge.className = 'notif-badge';
+    badge.title = 'Nowe wpisy';
+    navEl.appendChild(badge);
+  }
+}
 
 /* =====================================================
    ROLE
@@ -373,13 +392,20 @@ async function loadDashboard() {
     const rSnap = await getDocs(collection(db,'receipts'));
     let totalSales=0, totalStable=0, totalWorkers=0;
     let allTimeTotal=0; // łączna kwota wszystkich rachunków (100%) — stajnia fizycznie trzyma całą gotówkę
+    let todaySales=0;   // tylko dzisiejsze rachunki
     const workerMap = {};
     const recentRows = [];
 
     const week = currentWeek();
+    const todayStr = new Date().toLocaleDateString('sv-SE'); // format YYYY-MM-DD
     rSnap.forEach(d => {
       const r = d.data();
       allTimeTotal += r.total || 0; // zlicz 100% ze wszystkich rachunków
+      /* Sprzedaż dziś — porównaj datę bez strefy czasowej */
+      if (r.createdAt?.toDate) {
+        const rDateStr = r.createdAt.toDate().toLocaleDateString('sv-SE');
+        if (rDateStr === todayStr) todaySales += r.total || 0;
+      }
       /* Dla nowych rachunków sprawdź pole week, dla starych wylicz z daty */
       const rWeek = r.week || dateToWeek(r.createdAt);
       if (rWeek !== week) return;
@@ -428,15 +454,9 @@ async function loadDashboard() {
     /* Stan kasy stajni = 100% wpływów + wpłaty do kasy − wydatki − wypłaty */
     const treasury = allTimeTotal + allTimeDeposits - allTimeExp - allTimePaid;
 
-    document.getElementById('stat-today').textContent       = fmt(totalSales);
+    document.getElementById('stat-today').textContent       = fmt(todaySales);
     document.getElementById('stat-stable').textContent      = fmt(totalStable);
     document.getElementById('stat-workers-tab').textContent = fmt(totalWorkers);
-    const financeNet = allTimeDeposits - allTimeExp;
-    const finEl = document.getElementById('stat-finance');
-    if (finEl) {
-      finEl.textContent = fmt(financeNet);
-      finEl.style.color = financeNet >= 0 ? '#6abf7e' : '#c94040';
-    }
     const tEl = document.getElementById('stat-treasury');
     if (tEl) {
       tEl.textContent = fmt(treasury);
@@ -1838,8 +1858,15 @@ async function loadInstructions() {
   try {
     const snap = await getDocs(query(collection(db,'instructions'), orderBy('createdAt','desc')));
     _instrCache = [];
-    snap.forEach(d => _instrCache.push({ _id: d.id, ...d.data() }));
+    let newestInstrMs = 0;
+    snap.forEach(d => {
+      const data = d.data();
+      _instrCache.push({ _id: d.id, ...data });
+      const ts = data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0;
+      if (ts > newestInstrMs) newestInstrMs = ts;
+    });
     renderInstructions(_instrCache);
+    updateNotifBadge('instructions', newestInstrMs);
   } catch(e) { console.error('Instructions:', e); }
 }
 
@@ -1899,6 +1926,7 @@ window.saveInstruction = async function() {
       authorName: currentProfile?.displayName || currentUser.email,
       createdAt:  serverTimestamp()
     });
+    localStorage.setItem('lastSeen_instructions', Date.now().toString());
     showToast('✓ Instrukcja opublikowana');
     clearInstructionForm();
     loadInstructions();
@@ -1936,6 +1964,7 @@ async function loadNotes() {
     const snap = await getDocs(query(collection(db,'notes'), orderBy('createdAt','desc')));
     if (snap.empty) {
       el.innerHTML = '<div style="text-align:center;padding:2.5rem;font-family:var(--font-type);color:var(--dust);opacity:0.6">📌 Brak notatek.</div>';
+      updateNotifBadge('notes', 0);
       return;
     }
     const prioMap = {
@@ -1944,8 +1973,11 @@ async function loadNotes() {
       normal:    { label:'🔵 Zwykła', cls:'note-normal'    },
     };
     el.innerHTML = '';
+    let newestNoteMs = 0;
     snap.forEach(d => {
       const n    = d.data();
+      const ts = n.createdAt?.seconds ? n.createdAt.seconds * 1000 : 0;
+      if (ts > newestNoteMs) newestNoteMs = ts;
       const prio = prioMap[n.priority] || prioMap.normal;
       const canDel = isOwnerLevel() || n.authorUid === currentUser.uid;
       el.innerHTML += `<div class="note-card ${prio.cls}">
@@ -1963,6 +1995,7 @@ async function loadNotes() {
         <div class="note-body">${(n.body||'').replace(/\n/g,'<br>')}</div>
       </div>`;
     });
+    updateNotifBadge('notes', newestNoteMs);
   } catch(e) { console.error('Notes:', e); }
 }
 
@@ -1978,6 +2011,7 @@ window.saveNote = async function() {
       authorName: currentProfile?.displayName||currentUser.email,
       createdAt:  serverTimestamp()
     });
+    localStorage.setItem('lastSeen_notes', Date.now().toString());
     showToast('✓ Notatka dodana'); clearNoteForm(); loadNotes();
   } catch(e) { showToast('❌ '+e.message); }
 };
