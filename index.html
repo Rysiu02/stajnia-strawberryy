@@ -121,6 +121,9 @@
     <div class="nav-item" onclick="goTo('accounts',this)" data-min-role="owner">
       <span class="nav-icon">🔑</span> Konta
     </div>
+    <div class="nav-item" onclick="goTo('discord',this);loadDiscordSettings()" data-min-role="owner">
+      <span class="nav-icon">🔔</span> Discord
+    </div>
 
     <div class="nav-wanted">
       <div class="nav-wanted-title">⚠ Rola</div>
@@ -165,7 +168,7 @@
           <div class="stat-card-icon">💵</div>
           <div class="stat-card-label">Stan kasy stajni</div>
           <div class="stat-card-value" id="stat-treasury">—</div>
-          <div class="stat-card-change">przychód + wpłaty − wydatki − wypłaty</div>
+          <div class="stat-card-change">łącznie od początku: przychód + wpłaty − wydatki − wypłaty</div>
         </div>
       </div>
 
@@ -296,7 +299,11 @@
       <div class="panel">
         <div class="panel-header">
           <div class="panel-title">📋 Historia Rachunków</div>
-          <div style="display:flex;gap:0.5rem;align-items:center">
+          <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+            <input class="form-input" id="receipts-search-client" type="text"
+              style="padding:0.3rem 0.6rem;font-size:0.75rem;width:180px"
+              placeholder="🔍 Szukaj klienta..."
+              oninput="filterReceiptsClient()"/>
             <input class="form-input" id="receipts-filter-month" type="month"
               style="padding:0.3rem 0.6rem;font-size:0.75rem;width:160px"
               onchange="loadReceiptsHistory()"/>
@@ -551,7 +558,7 @@
             <div class="form-group">
               <label>Stawka podatkowa (%)</label>
               <input class="form-input" id="tax-rate-input" type="number" min="0" max="100" step="0.5"
-                placeholder="np. 19" style="width:150px"/>
+                placeholder="np. 19" style="width:150px" oninput="recalcTaxDisplay()"/>
             </div>
             <button class="btn btn-primary" onclick="saveTaxRate()">Ustaw stawkę</button>
           </div>
@@ -653,6 +660,14 @@
             </div>
             <div class="form-group">
               <label>Treść</label>
+              <div class="emoji-wrap" style="display:block">
+                <button type="button" class="emoji-trigger-btn" style="margin-bottom:0.35rem"
+                  onclick="openEmojiPicker('instr-emoji','instr-body')">😀 Dodaj emotikon</button>
+                <div id="instr-emoji-panel" class="emoji-picker-panel">
+                  <input class="emoji-picker-search" placeholder="Szukaj..." oninput="onEmojiSearch('instr-emoji-panel',this.value)"/>
+                  <div class="emoji-picker-grid"></div>
+                </div>
+              </div>
               <textarea class="form-textarea" id="instr-body" rows="6" placeholder="Szczegółowy opis, kroki do wykonania..."></textarea>
             </div>
           </div>
@@ -677,6 +692,45 @@
       <!-- Lista instrukcji -->
       <div id="instructions-list">
         <div style="font-family:var(--font-type);color:var(--dust);padding:1rem">Wczytywanie...</div>
+      </div>
+    </section>
+
+    <!-- ===== DISCORD ===== -->
+    <section class="page-section" id="section-discord">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Discord Webhooks</div>
+          <div class="page-subtitle">Integracja z kanałami Discord</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🔔 Ustawienia Webhooków</div>
+        </div>
+        <div class="panel-body" id="discord-settings-content">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>URL Webhooka — Notatki</label>
+              <input class="form-input" id="discord-notes-url" type="url" placeholder="https://discord.com/api/webhooks/..."/>
+              <div style="font-size:0.72rem;color:var(--dust);margin-top:0.3rem">Notatki będą wysyłane na ten kanał Discord</div>
+            </div>
+            <div class="form-group">
+              <label>URL Webhooka — Instrukcje</label>
+              <input class="form-input" id="discord-instr-url" type="url" placeholder="https://discord.com/api/webhooks/..."/>
+              <div style="font-size:0.72rem;color:var(--dust);margin-top:0.3rem">Instrukcje będą wysyłane na osobny kanał Discord</div>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem">
+            <button class="btn btn-primary" onclick="saveDiscordSettings()">&#128190; Zapisz ustawienia</button>
+          </div>
+          <div style="margin-top:1.5rem;padding:1rem;border:1px solid rgba(196,122,43,0.2);background:rgba(196,122,43,0.05)">
+            <p style="font-family:var(--font-type);font-size:0.78rem;color:var(--dust);line-height:1.8">
+              ⚙ URL Webhooka znajdziesz w ustawieniach kanału Discord &rarr; Integracje &rarr; Webhooki.<br>
+              Każda nowa notatka i instrukcja jest wysyłana automatycznie.<br>
+              Przycisk <strong>🔔 Discord</strong> przy każdej pozycji pozwala wysłać ją ręcznie (synchronizacja wsteczna).
+            </p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -709,6 +763,14 @@
             </div>
             <div class="form-group">
               <label>Treść</label>
+              <div class="emoji-wrap" style="display:block">
+                <button type="button" class="emoji-trigger-btn" style="margin-bottom:0.35rem"
+                  onclick="openEmojiPicker('note-emoji','note-body')">😀 Dodaj emotikon</button>
+                <div id="note-emoji-panel" class="emoji-picker-panel">
+                  <input class="emoji-picker-search" placeholder="Szukaj..." oninput="onEmojiSearch('note-emoji-panel',this.value)"/>
+                  <div class="emoji-picker-grid"></div>
+                </div>
+              </div>
               <textarea class="form-textarea" id="note-body" placeholder="Treść ogłoszenia lub notatki..."></textarea>
             </div>
           </div>

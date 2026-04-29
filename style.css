@@ -1204,6 +1204,72 @@ main {
 }
 
 /* =====================================================
+   EMOJI PICKER
+   ===================================================== */
+.emoji-wrap {
+  position: relative;
+  display: inline-block;
+}
+.emoji-picker-panel {
+  display: none;
+  position: absolute;
+  z-index: 999;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 300px;
+  background: var(--saddle);
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  padding: 0.6rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+}
+.emoji-picker-panel.open { display: block; }
+.emoji-picker-search {
+  width: 100%;
+  background: var(--dirt);
+  border: 1px solid rgba(196,122,43,0.4);
+  color: var(--cream);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 3px;
+  margin-bottom: 0.5rem;
+  outline: none;
+}
+.emoji-picker-search:focus { border-color: var(--amber); }
+.emoji-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.emoji-picker-grid::-webkit-scrollbar { width: 4px; }
+.emoji-picker-grid::-webkit-scrollbar-thumb { background: var(--amber); border-radius: 2px; }
+.emoji-btn-item {
+  font-size: 1.35rem;
+  cursor: pointer;
+  padding: 3px 4px;
+  border-radius: 3px;
+  transition: background 0.1s;
+  line-height: 1;
+  background: none;
+  border: none;
+}
+.emoji-btn-item:hover { background: rgba(196,122,43,0.25); }
+.emoji-trigger-btn {
+  font-size: 1.1rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  background: rgba(196,122,43,0.1);
+  border: 1px solid rgba(196,122,43,0.35);
+  border-radius: 3px;
+  color: var(--amber);
+  line-height: 1;
+  transition: background 0.15s;
+}
+.emoji-trigger-btn:hover { background: rgba(196,122,43,0.25); }
+
+/* =====================================================
    KAFELKI CENNIKA
    ===================================================== */
 .catalog-section-label {

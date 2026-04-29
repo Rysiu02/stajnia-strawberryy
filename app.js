@@ -18,6 +18,7 @@ import {
    WŁASNY MODAL — zamiast confirm/alert
    ===================================================== */
 let _dialogResolve = null;
+let _taxNetBase    = 0;
 
 function showConfirm(msg, confirmLabel = 'Potwierdź', danger = true) {
   return new Promise(resolve => {
@@ -273,6 +274,7 @@ function loadAll() {
   loadTax();
   loadNotes();
   loadInstructions();
+  loadDiscordCfg();
   renderBasket();  // inicjalizuj pusty koszyk
   loadReceiptWorkers(); // lista pracowników do selecta w rachunku
 }
@@ -796,7 +798,7 @@ window.saveReceipt = async function() {
 
     clearReceipt();
     loadDashboard();
-    loadReceiptsHistory();
+    _receiptsCacheMonth = null; loadReceiptsHistory();
     loadPayroll();        // odśwież wypłaty — nowy rachunek wpływa na zakładki
     buildCatalogTiles();
   } catch(e) {
@@ -840,41 +842,64 @@ async function loadReceiptWorkers() {
 /* =====================================================
    RACHUNKI — historia (filtrowanie w JS, bez indeksu)
    ===================================================== */
-window.loadReceiptsHistory = async function() {
-  const month  = document.getElementById('receipts-filter-month')?.value || currentMonth();
-  const tbody  = document.getElementById('receipts-history-body');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;padding:1rem">Ładowanie...</td></tr>';
-  try {
-    const snap = await getDocs(collection(db,'receipts'));
-    let rows = [];
-    snap.forEach(d => {
-      const r = d.data();
-      if (r.month !== month) return;
-      /* Pracownik widzi tylko swoje; obserwator i właściciel widzą wszystkie */
-      if (currentRole === 'worker' && r.workerUid !== currentUser.uid) return;
-      rows.push({ ...r, _id: d.id });
-    });
-    rows.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+let _receiptsCache = [];    // cache rachunków dla bieżącego miesiąca
+let _receiptsCacheMonth = null;
 
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;padding:1.5rem">Brak rachunków w tym miesiącu</td></tr>';
-      return;
-    }
-    tbody.innerHTML = rows.map(r => `
-      <tr onclick="openReceiptModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">
-        <td class="muted">${fmtD(r.createdAt)}</td>
-        <td>${r.client||'—'}</td>
-        <td>${r.workerName||'—'}</td>
-        <td style="font-size:0.75rem;color:var(--dust)">${(r.lines||[]).map(l=>`${l.name} ×${l.qty}`).join(', ')}</td>
-        <td style="font-size:0.75rem;color:var(--dust);font-style:italic">${r.note||'—'}</td>
-        <td><strong style="color:var(--pale-gold)">${fmt(r.total)}</strong></td>
-        <td style="color:var(--amber)">${fmt(r.stable)}</td>
-        <td style="color:#6abf7e">${fmt(r.workerCut)}</td>
-        <td onclick="event.stopPropagation()">${isOwnerLevel() ? `<button class="btn btn-danger" style="padding:0.2rem 0.4rem;font-size:0.65rem"
-          onclick="deleteReceipt('${r._id}')">Usuń</button>` : ''}</td>
-      </tr>`).join('');
-  } catch(e) { console.error('Receipts history:', e); showToast('❌ Błąd ładowania rachunków'); }
+function renderReceiptsTable(rows) {
+  const tbody = document.getElementById('receipts-history-body');
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:1.5rem">Brak rachunków</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr onclick="openReceiptModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+      <td class="muted">${fmtD(r.createdAt)}</td>
+      <td>${r.client||'—'}</td>
+      <td>${r.workerName||'—'}</td>
+      <td style="font-size:0.75rem;color:var(--dust)">${(r.lines||[]).map(l=>`${l.name} ×${l.qty}`).join(', ')}</td>
+      <td style="font-size:0.75rem;color:var(--dust);font-style:italic">${r.note||'—'}</td>
+      <td><strong style="color:var(--pale-gold)">${fmt(r.total)}</strong></td>
+      <td style="color:var(--amber)">${fmt(r.stable)}</td>
+      <td style="color:#6abf7e">${fmt(r.workerCut)}</td>
+      <td onclick="event.stopPropagation()">${isOwnerLevel() ? `<button class="btn btn-danger" style="padding:0.2rem 0.4rem;font-size:0.65rem"
+        onclick="deleteReceipt('${r._id}')">Usuń</button>` : ''}</td>
+    </tr>`).join('');
+}
+
+window.filterReceiptsClient = function() {
+  const search = (document.getElementById('receipts-search-client')?.value || '').trim().toLowerCase();
+  if (!search) { renderReceiptsTable(_receiptsCache); return; }
+  renderReceiptsTable(_receiptsCache.filter(r => (r.client||'').toLowerCase().includes(search)));
+};
+
+window.loadReceiptsHistory = async function() {
+  const month = document.getElementById('receipts-filter-month')?.value || currentMonth();
+  const tbody = document.getElementById('receipts-history-body');
+  if (!tbody) return;
+
+  /* Pobierz z bazy tylko gdy zmienił się miesiąc */
+  if (month !== _receiptsCacheMonth) {
+    tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:1rem">Ładowanie...</td></tr>';
+    try {
+      const snap = await getDocs(collection(db,'receipts'));
+      let rows = [];
+      snap.forEach(d => {
+        const r = d.data();
+        if (r.month !== month) return;
+        if (currentRole === 'worker' && r.workerUid !== currentUser.uid) return;
+        rows.push({ ...r, _id: d.id });
+      });
+      rows.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+      _receiptsCache = rows;
+      _receiptsCacheMonth = month;
+    } catch(e) { console.error('Receipts history:', e); showToast('❌ Błąd ładowania rachunków'); return; }
+  }
+
+  /* Zastosuj aktywny filtr klienta */
+  const search = (document.getElementById('receipts-search-client')?.value || '').trim().toLowerCase();
+  const filtered = search ? _receiptsCache.filter(r => (r.client||'').toLowerCase().includes(search)) : _receiptsCache;
+  renderReceiptsTable(filtered);
 };
 
 /* =====================================================
@@ -1108,7 +1133,7 @@ window.saveReceiptEdits = async function() {
     });
     showToast('✓ Rachunek zaktualizowany');
     closeReceiptModal();
-    loadReceiptsHistory();
+    _receiptsCacheMonth = null; loadReceiptsHistory();
     loadDashboard();
     loadPayroll();
   } catch(e) {
@@ -1127,7 +1152,7 @@ window.deleteReceipt = async function(id) {
   try {
     await deleteDoc(doc(db,'receipts',id));
     showToast('✓ Rachunek usunięty');
-    loadReceiptsHistory(); loadDashboard();
+    _receiptsCacheMonth = null; loadReceiptsHistory(); loadDashboard();
   } catch(e) { showToast('❌ ' + e.message); }
 };
 
@@ -1633,13 +1658,21 @@ window.loadTax = async function() {
     const rate     = rateSnap.exists() ? (rateSnap.data().rate || 0) : 0;
     const taxAmt   = net * (rate / 100);
 
+    _taxNetBase = net;
     document.getElementById('tax-income').textContent       = fmt(income);
     document.getElementById('tax-exp').textContent          = fmt(expenses);
-    document.getElementById('tax-net').textContent          = fmt(net);
+    document.getElementById('tax-net').textContent          = fmt(net - taxAmt);
     document.getElementById('tax-rate-display').textContent = rate + '%  (' + fmt(taxAmt) + ')';
     const ri = document.getElementById('tax-rate-input');
-    if (ri) ri.value = rate || '';
+    if (ri) ri.value = (rate != null) ? rate : '';
   } catch(e) { console.error('Tax:', e); }
+};
+
+window.recalcTaxDisplay = function() {
+  const rate   = parseFloat(document.getElementById('tax-rate-input')?.value) || 0;
+  const taxAmt = _taxNetBase * (rate / 100);
+  document.getElementById('tax-net').textContent          = fmt(_taxNetBase - taxAmt);
+  document.getElementById('tax-rate-display').textContent = rate + '%  (' + fmt(taxAmt) + ')';
 };
 
 window.saveTaxRate = async function() {
@@ -1898,6 +1931,8 @@ function renderInstructions(list) {
         </div>
         <div style="display:flex;align-items:center;gap:0.75rem;flex-shrink:0">
           <span class="instr-meta">${n.authorName||'—'} · ${fmtD(n.createdAt)}</span>
+          ${isOwnerLevel() ? `<button class="btn btn-ghost" style="padding:0.2rem 0.5rem;font-size:0.65rem" title="Wyślij na Discord"
+            onclick="syncInstrToDiscord('${n._id}')">🔔 Discord</button>` : ''}
           ${canDel ? `<button class="btn btn-danger" style="padding:0.2rem 0.5rem;font-size:0.65rem"
             onclick="deleteInstruction('${n._id}')">Usuń</button>` : ''}
         </div>
@@ -1920,16 +1955,18 @@ window.saveInstruction = async function() {
   const category = document.getElementById('instr-category').value;
   if (!title || !body) { showToast('⚠ Wypełnij tytuł i treść'); return; }
   try {
-    await addDoc(collection(db,'instructions'), {
+    const instrPayload = {
       title, body, category,
       authorUid:  currentUser.uid,
       authorName: currentProfile?.displayName || currentUser.email,
       createdAt:  serverTimestamp()
-    });
+    };
+    await addDoc(collection(db,'instructions'), instrPayload);
     localStorage.setItem('lastSeen_instructions', Date.now().toString());
     showToast('✓ Instrukcja opublikowana');
     clearInstructionForm();
     loadInstructions();
+    if (_discordCfg.instructionsUrl) sendToDiscord(_discordCfg.instructionsUrl, buildInstrEmbed({ ...instrPayload, createdAt: null }));
   } catch(e) { showToast('❌ ' + e.message); }
 };
 
@@ -1988,6 +2025,8 @@ async function loadNotes() {
           </div>
           <div style="display:flex;align-items:center;gap:0.75rem">
             <span class="note-meta">${n.authorName||'—'} · ${fmtD(n.createdAt)}</span>
+            ${isOwnerLevel()?`<button class="btn btn-ghost" style="padding:0.2rem 0.5rem;font-size:0.65rem" title="Wyślij na Discord"
+              onclick="syncNoteToDiscord('${d.id}')">🔔 Discord</button>`:''}
             ${canDel?`<button class="btn btn-danger" style="padding:0.2rem 0.5rem;font-size:0.65rem"
               onclick="deleteNote('${d.id}')">Usuń</button>`:''}
           </div>
@@ -2005,14 +2044,16 @@ window.saveNote = async function() {
   const priority = document.getElementById('note-priority').value;
   if (!title||!body) { showToast('⚠ Wypełnij tytuł i treść'); return; }
   try {
-    await addDoc(collection(db,'notes'), {
+    const notePayload = {
       title, body, priority,
       authorUid:  currentUser.uid,
       authorName: currentProfile?.displayName||currentUser.email,
       createdAt:  serverTimestamp()
-    });
+    };
+    await addDoc(collection(db,'notes'), notePayload);
     localStorage.setItem('lastSeen_notes', Date.now().toString());
     showToast('✓ Notatka dodana'); clearNoteForm(); loadNotes();
+    if (_discordCfg.notesUrl) sendToDiscord(_discordCfg.notesUrl, buildNoteEmbed({ ...notePayload, createdAt: null }));
   } catch(e) { showToast('❌ '+e.message); }
 };
 window.clearNoteForm = function() {
@@ -2024,6 +2065,188 @@ window.deleteNote = async function(id) {
   if (!await showConfirm('Usunąć tę notatkę?', 'Usuń')) return;
   try { await deleteDoc(doc(db,'notes',id)); showToast('✓ Usunięto'); loadNotes(); }
   catch(e) { showToast('❌ '+e.message); }
+};
+
+/* =====================================================
+   EMOJI PICKER
+   ===================================================== */
+const EMOJI_LIST = [
+  '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙',
+  '😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥',
+  '😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤧','🥵','🥶','😲','😳','🥺','😦','😧','😨','😰','😥','😢',
+  '😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','💩','🤡','👹','👺',
+  '👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾',
+  '👋','🤚','🖐','✋','🖖','👌','🤌','🤏','✌','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','👍','👎',
+  '✊','👊','🤛','🤜','👏','🙌','🤲','🙏','✍','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃',
+  '❤','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣','💕','💞','💓','💗','💖','💘','💝','💟','☮',
+  '✨','🌟','⭐','🌠','🌌','🌙','☀','⛅','🌤','⛈','🌧','❄','🔥','💧','🌊','🌈',
+  '🐎','🐴','🦄','🐂','🐄','🐷','🐔','🐣','🦊','🐺','🦁','🐯','🐻','🐼','🐨','🐸','🦋','🐝','🌺','🌸',
+  '🍎','🍊','🍋','🍇','🍓','🍒','🥕','🌽','🧅','🧄','🍞','🧀','🥩','🍖','🍗','🥚','🍳','☕','🍵',
+  '⚽','🏀','🏈','⚾','🎾','🏐','🎯','🏆','🥇','🎖','🃏','🎲','🎮','🕹',
+  '🚗','🚕','🚙','🏎','🚓','🚑','🚒','🚐','🛻','🚚','🏠','🏡','🏰','🏯','🗼','⛺',
+  '💰','💵','💴','💶','💷','💸','💳','🪙','📦','📫','📬','📭','📮','📝','📋','📁','📂',
+  '⚠','🔴','🟡','🟢','🔵','🟣','⚫','⚪','🔶','🔷','✅','❌','❓','❗','💡','🔔','🔕','🔒','🔓','🔑',
+  '⭕','🆕','🆒','🆗','🆙','🆓','🆖','🅰','🅱','🅾','🆘','🏧','⛽','🚧','⛔','🚫','🚷','🚯',
+];
+
+let _emojiTarget = null;  // aktywny input/textarea
+
+window.openEmojiPicker = function(triggerId, targetId) {
+  _emojiTarget = document.getElementById(targetId);
+  const panel  = document.getElementById(triggerId + '-panel');
+  if (!panel) return;
+  const isOpen = panel.classList.contains('open');
+  // zamknij wszystkie otwarte pickery
+  document.querySelectorAll('.emoji-picker-panel.open').forEach(p => p.classList.remove('open'));
+  if (!isOpen) {
+    panel.classList.add('open');
+    const search = panel.querySelector('.emoji-picker-search');
+    if (search) { search.value = ''; renderEmojiGrid(panel, ''); search.focus(); }
+  }
+};
+
+function renderEmojiGrid(panel, filter) {
+  const grid = panel.querySelector('.emoji-picker-grid');
+  const list = filter ? EMOJI_LIST.filter(e => e.includes(filter)) : EMOJI_LIST;
+  grid.innerHTML = list.map(e =>
+    `<button class="emoji-btn-item" onclick="insertEmoji('${e}')" title="${e}">${e}</button>`
+  ).join('');
+}
+
+window.insertEmoji = function(emoji) {
+  if (!_emojiTarget) return;
+  const el    = _emojiTarget;
+  const start = el.selectionStart ?? el.value.length;
+  const end   = el.selectionEnd   ?? el.value.length;
+  el.value    = el.value.slice(0, start) + emoji + el.value.slice(end);
+  el.selectionStart = el.selectionEnd = start + emoji.length;
+  el.focus();
+};
+
+window.onEmojiSearch = function(panel, val) {
+  const p = document.getElementById(panel);
+  if (p) renderEmojiGrid(p, val);
+};
+
+// zamknij picker kliknięciem poza
+document.addEventListener('click', e => {
+  if (!e.target.closest('.emoji-wrap')) {
+    document.querySelectorAll('.emoji-picker-panel.open').forEach(p => p.classList.remove('open'));
+  }
+});
+
+/* =====================================================
+   DISCORD WEBHOOK
+   ===================================================== */
+let _discordCfg = { notesUrl: '', instructionsUrl: '' };
+
+async function loadDiscordCfg() {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'discord'));
+    if (snap.exists()) _discordCfg = { notesUrl: '', instructionsUrl: '', ...snap.data() };
+  } catch(_) {}
+}
+
+async function sendToDiscord(url, payload) {
+  if (!url) return false;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch(e) { console.error('Discord webhook:', e); return false; }
+}
+
+function buildNoteEmbed(n) {
+  const prioMap = {
+    urgent:    { label: '🔴 PILNA',  color: 0xE53935 },
+    important: { label: '🟡 WAŻNA',  color: 0xFDD835 },
+    normal:    { label: '🔵 Zwykła', color: 0x1E88E5 },
+  };
+  const prio = prioMap[n.priority] || prioMap.normal;
+  const dateStr = n.createdAt?.seconds
+    ? new Date(n.createdAt.seconds * 1000).toLocaleString('pl-PL')
+    : new Date().toLocaleString('pl-PL');
+  return {
+    embeds: [{
+      title: `📌 ${prio.label} — ${n.title || '—'}`,
+      description: n.body || '',
+      color: prio.color,
+      footer: { text: `✍ ${n.authorName || '—'} · ${dateStr}` }
+    }]
+  };
+}
+
+function buildInstrEmbed(n) {
+  const catMap = {
+    bezpieczenstwo: { label: 'Bezpieczeństwo', color: 0xE53935 },
+    procedura:      { label: 'Procedura',      color: 0xFB8C00 },
+    obowiazki:      { label: 'Obowiązki',      color: 0xFDD835 },
+    ogolna:         { label: 'Ogólna',         color: 0x1E88E5 },
+    inne:           { label: 'Inne',           color: 0x8E24AA },
+  };
+  const cat = catMap[n.category] || catMap.ogolna;
+  const dateStr = n.createdAt?.seconds
+    ? new Date(n.createdAt.seconds * 1000).toLocaleString('pl-PL')
+    : new Date().toLocaleString('pl-PL');
+  return {
+    thread_name: `[${cat.label}] ${n.title || '—'}`,   // wymagane dla Discord Forum Channel
+    embeds: [{
+      title: `📖 [${cat.label}] ${n.title || '—'}`,
+      description: n.body || '',
+      color: cat.color,
+      footer: { text: `✍ ${n.authorName || '—'} · ${dateStr}` }
+    }]
+  };
+}
+
+window.syncNoteToDiscord = async function(id) {
+  if (!_discordCfg.notesUrl) { showToast('⚠ Brak URL webhooka notatek — ustaw w sekcji Discord'); return; }
+  try {
+    const snap = await getDoc(doc(db, 'notes', id));
+    if (!snap.exists()) { showToast('⚠ Notatka nie istnieje'); return; }
+    showToast('⏳ Wysyłam...');
+    const ok = await sendToDiscord(_discordCfg.notesUrl, buildNoteEmbed(snap.data()));
+    showToast(ok ? '✓ Wysłano na Discord' : '❌ Błąd wysyłania — sprawdź URL webhooka');
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+window.syncInstrToDiscord = async function(id) {
+  if (!_discordCfg.instructionsUrl) { showToast('⚠ Brak URL webhooka instrukcji — ustaw w sekcji Discord'); return; }
+  try {
+    const snap = await getDoc(doc(db, 'instructions', id));
+    if (!snap.exists()) { showToast('⚠ Instrukcja nie istnieje'); return; }
+    showToast('⏳ Wysyłam...');
+    const ok = await sendToDiscord(_discordCfg.instructionsUrl, buildInstrEmbed(snap.data()));
+    showToast(ok ? '✓ Wysłano na Discord' : '❌ Błąd wysyłania — sprawdź URL webhooka');
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+window.saveDiscordSettings = async function() {
+  const notesUrl        = document.getElementById('discord-notes-url').value.trim();
+  const instructionsUrl = document.getElementById('discord-instr-url').value.trim();
+  try {
+    await setDoc(doc(db, 'settings', 'discord'), { notesUrl, instructionsUrl, updatedAt: serverTimestamp() });
+    _discordCfg = { notesUrl, instructionsUrl };
+    showToast('✓ Zapisano ustawienia Discord');
+  } catch(e) { showToast('❌ ' + e.message); }
+};
+
+window.loadDiscordSettings = async function() {
+  if (!isOwnerLevel()) return;
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'discord'));
+    if (snap.exists()) {
+      const data = snap.data();
+      _discordCfg = { notesUrl: data.notesUrl || '', instructionsUrl: data.instructionsUrl || '' };
+      const nu = document.getElementById('discord-notes-url');
+      const iu = document.getElementById('discord-instr-url');
+      if (nu) nu.value = data.notesUrl || '';
+      if (iu) iu.value = data.instructionsUrl || '';
+    }
+  } catch(e) { console.error('Discord settings:', e); }
 };
 
 /* =====================================================
