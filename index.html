@@ -91,6 +91,9 @@
     <div class="nav-item" onclick="goTo('pricelist',this)">
       <span class="nav-icon">💲</span> Cennik
     </div>
+    <div class="nav-item" onclick="goTo('horses',this);renderHorsesPage()">
+      <span class="nav-icon">🐎</span> Konie
+    </div>
 
     <div class="nav-divider"></div>
     <div class="nav-section-label">Finanse</div>
@@ -169,6 +172,12 @@
           <div class="stat-card-label">Stan kasy stajni</div>
           <div class="stat-card-value" id="stat-treasury">—</div>
           <div class="stat-card-change">łącznie od początku: przychód + wpłaty − wydatki − wypłaty</div>
+        </div>
+        <div class="stat-card stat-card--topseller">
+          <div class="stat-card-icon">🏆</div>
+          <div class="stat-card-label">Najlepszy sprzedawca koni</div>
+          <div class="stat-card-value" id="stat-top-horse-seller">—</div>
+          <div class="stat-card-change" id="stat-top-horse-count">sprzedanych koni od początku</div>
         </div>
       </div>
 
@@ -785,6 +794,59 @@
       <div id="notes-list">
         <div style="font-family:var(--font-type);color:var(--dust);padding:1rem">Ładowanie...</div>
       </div>
+    </section>
+
+    <!-- ===== KONIE ===== -->
+    <section class="page-section" id="section-horses">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Konie</div>
+          <div class="page-subtitle">Katalog ras · Widełki cen · Cechy</div>
+        </div>
+      </div>
+
+      <!-- Panel filtrów -->
+      <div class="horses-filters">
+        <div class="horses-filter-row">
+          <div class="hf-group">
+            <label class="hf-label">Szukaj nazwy</label>
+            <input class="form-input hf-input" id="hf-name" type="text" placeholder="np. Mustang..." oninput="applyHorseFilters()"/>
+          </div>
+          <div class="hf-group">
+            <label class="hf-label">Cena max ($)</label>
+            <input class="form-input hf-input" id="hf-price" type="number" min="0" placeholder="np. 400" oninput="applyHorseFilters()"/>
+          </div>
+          <div class="hf-group">
+            <label class="hf-label">Kategoria</label>
+            <div class="western-select-wrap">
+              <select class="form-input hf-input" id="hf-cat" onchange="applyHorseFilters()">
+                <option value="">Wszystkie</option>
+                <option>Robocze</option>
+                <option>Wierzchowce</option>
+                <option>Wyścigowe</option>
+                <option>Kuce</option>
+                <option>Egzotyczne</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-ghost hf-reset" onclick="resetHorseFilters()">✕ Wyczyść</button>
+        </div>
+        <div class="horses-filter-row" style="margin-top:0.6rem">
+          <span class="hf-sort-label">Sortuj wg cechy:</span>
+          <div class="hf-sort-btns">
+            <button class="hf-sort-btn" data-stat="zdrowie"       onclick="toggleHorseSort('zdrowie')">      ❤️ Zdrowie</button>
+            <button class="hf-sort-btn" data-stat="wytrzymalosc"  onclick="toggleHorseSort('wytrzymalosc')"> 💪 Wytrzymałość</button>
+            <button class="hf-sort-btn" data-stat="odwaga"        onclick="toggleHorseSort('odwaga')">       🦁 Odwaga</button>
+            <button class="hf-sort-btn" data-stat="zwinnosc"      onclick="toggleHorseSort('zwinnosc')">     🌀 Zwinność</button>
+            <button class="hf-sort-btn" data-stat="predkosc"      onclick="toggleHorseSort('predkosc')">     💨 Prędkość</button>
+            <button class="hf-sort-btn" data-stat="przyspieszenie" onclick="toggleHorseSort('przyspieszenie')">&#9889; Przyspieszenie</button>
+          </div>
+        </div>
+        <div class="hf-results" id="hf-results"></div>
+      </div>
+
+      <div class="horses-categories" id="horses-categories"></div>
+      <div class="horses-grid" id="horses-grid"></div>
     </section>
 
   </main>

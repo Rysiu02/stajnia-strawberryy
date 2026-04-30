@@ -528,6 +528,226 @@ main {
 .stat-card--treasury .stat-card-label { color: var(--gold); }
 .stat-card--treasury .stat-card-value { font-size: 1.75rem; }
 
+/* Kafelek najlepszego sprzedawcy koni */
+.stat-card--topseller {
+  border-color: rgba(106,191,126,0.5);
+  background: linear-gradient(135deg, rgba(10,35,15,0.92), rgba(5,18,8,0.96));
+  box-shadow: 0 0 18px rgba(106,191,126,0.1), inset 0 0 30px rgba(0,0,0,0.3);
+}
+.stat-card--topseller .stat-card-label { color: #6abf7e; }
+.stat-card--topseller .stat-card-value { font-size: 1.2rem; color: #a0e8b0; }
+
+/* =====================================================
+   KONIE — katalog
+   ===================================================== */
+.horses-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+.horses-cat-btn {
+  font-family: var(--font-type);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.2rem;
+  border: 1px solid rgba(196,122,43,0.35);
+  background: rgba(30,16,5,0.7);
+  color: var(--dust);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.horses-cat-btn:hover {
+  border-color: var(--amber);
+  color: var(--pale-gold);
+  background: rgba(60,32,8,0.9);
+}
+.horses-cat-btn.active {
+  border-color: var(--gold);
+  background: rgba(80,45,10,0.9);
+  color: var(--pale-gold);
+  box-shadow: 0 0 8px rgba(196,122,43,0.2);
+}
+.horses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+.horse-card {
+  border: 1px solid rgba(196,122,43,0.25);
+  background: linear-gradient(180deg, rgba(30,16,5,0.9), rgba(13,8,0,0.9));
+  padding: 1rem 1.1rem;
+  border-radius: 6px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.horse-card:hover {
+  border-color: rgba(196,122,43,0.5);
+  box-shadow: 0 0 10px rgba(196,122,43,0.08);
+}
+.horse-card-name {
+  font-family: var(--font-head);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--pale-gold);
+  margin-bottom: 0.3rem;
+}
+.horse-card-price {
+  font-family: var(--font-type);
+  font-size: 0.78rem;
+  color: #6abf7e;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.horse-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.horse-stat {
+  display: grid;
+  grid-template-columns: 1fr 70px 28px;
+  align-items: center;
+  gap: 0.45rem;
+}
+.horse-stat-label {
+  font-family: var(--font-type);
+  font-size: 0.67rem;
+  color: var(--dust);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.horse-stat-bar {
+  height: 5px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.horse-stat-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber), var(--gold));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.horse-stat-val {
+  font-family: var(--font-type);
+  font-size: 0.65rem;
+  color: var(--pale-gold);
+  text-align: right;
+}
+/* Podświetlona cecha (aktywny sort) */
+.horse-stat--hl .horse-stat-label    { color: var(--pale-gold); font-weight: 700; }
+.horse-stat-fill--hl                 { background: linear-gradient(90deg, #6abf7e, #a0e8b0); }
+.horse-stat-val--hl                  { color: #a0e8b0; font-weight: 700; }
+/* Etykieta kategorii na kafelku (w trybie all) */
+.horse-card-cat {
+  font-family: var(--font-type);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dust);
+  margin-bottom: 0.3rem;
+}
+
+/* =====================================================
+   FILTRY KONI
+   ===================================================== */
+.horses-filters {
+  background: linear-gradient(180deg, rgba(30,16,5,0.85), rgba(13,8,0,0.85));
+  border: 1px solid rgba(196,122,43,0.25);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.2rem;
+}
+.horses-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+.hf-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.hf-label {
+  font-family: var(--font-type);
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dust);
+}
+.hf-input {
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.8rem !important;
+  width: 160px;
+}
+.hf-reset {
+  padding: 0.35rem 0.8rem !important;
+  font-size: 0.75rem !important;
+  align-self: flex-end;
+  margin-bottom: 0;
+}
+.hf-sort-label {
+  font-family: var(--font-type);
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dust);
+  align-self: center;
+  white-space: nowrap;
+}
+.hf-sort-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.hf-sort-btn {
+  font-family: var(--font-type);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid rgba(196,122,43,0.3);
+  background: rgba(30,16,5,0.7);
+  color: var(--dust);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.hf-sort-btn:hover {
+  border-color: var(--amber);
+  color: var(--pale-gold);
+}
+.hf-sort-btn.active {
+  border-color: #6abf7e;
+  background: rgba(10,35,15,0.9);
+  color: #a0e8b0;
+  box-shadow: 0 0 6px rgba(106,191,126,0.2);
+}
+.sort-order-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6abf7e;
+  color: #051005;
+  font-size: 0.6rem;
+  font-weight: 700;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.hf-results {
+  font-family: var(--font-type);
+  font-size: 0.7rem;
+  color: var(--dust);
+  margin-top: 0.6rem;
+  letter-spacing: 0.05em;
+}
+
 /* =====================================================
    PANEL / BOARD
    ===================================================== */
@@ -669,6 +889,57 @@ main {
 .form-input::placeholder, .form-textarea::placeholder {
   color: rgba(200,176,128,0.35);
   font-style: italic;
+}
+/* Ukryj natywne strzałki liczb */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+/* ── Własne strzałki liczb ── */
+.num-wrap {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+.num-wrap input[type=number] {
+  padding-right: 2rem !important;
+  flex: 1;
+}
+.num-arrows {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: 1.7rem;
+  border-left: 1px solid rgba(196,122,43,0.25);
+  overflow: hidden;
+}
+.num-arr-btn {
+  flex: 1;
+  background: rgba(15,8,0,0.6);
+  border: none;
+  color: rgba(196,122,43,0.7);
+  font-size: 0.55rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+  padding: 0;
+  line-height: 1;
+  user-select: none;
+}
+.num-arr-btn:hover {
+  background: rgba(196,122,43,0.18);
+  color: var(--pale-gold);
+}
+.num-arr-btn:active {
+  background: rgba(196,122,43,0.32);
+}
+.num-arr-btn + .num-arr-btn {
+  border-top: 1px solid rgba(196,122,43,0.18);
 }
 .form-select option { background: #1e1005; }
 .form-textarea { resize: vertical; min-height: 80px; }

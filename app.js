@@ -260,7 +260,46 @@ function showApp() {
   if (tw) tw.value = currentWeek();
 
   applyRoleRestrictions();
+  initNumberInputs();
   loadAll();
+}
+
+/* =====================================================
+   WŁASNE STRZAŁKI DLA input[type=number]
+   ===================================================== */
+function initNumberInputs(root) {
+  const scope = root || document;
+  scope.querySelectorAll('input[type=number]:not(.num-wrap-done)').forEach(inp => {
+    inp.classList.add('num-wrap-done');
+    const wrap = document.createElement('div');
+    wrap.className = 'num-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    const arrows = document.createElement('div');
+    arrows.className = 'num-arrows';
+    arrows.innerHTML =
+      `<button type="button" class="num-arr-btn" tabindex="-1" aria-label="Zwiększ">▲</button>` +
+      `<button type="button" class="num-arr-btn" tabindex="-1" aria-label="Zmniejsz">▼</button>`;
+    wrap.appendChild(arrows);
+    const [btnUp, btnDown] = arrows.querySelectorAll('.num-arr-btn');
+    const step = () => parseFloat(inp.step) || 1;
+    const min  = () => inp.min !== '' ? parseFloat(inp.min) : -Infinity;
+    const max  = () => inp.max !== '' ? parseFloat(inp.max) :  Infinity;
+    btnUp.addEventListener('click', () => {
+      const v = parseFloat(inp.value) || 0;
+      const nv = Math.min(max(), parseFloat((v + step()).toFixed(10)));
+      inp.value = nv;
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    btnDown.addEventListener('click', () => {
+      const v = parseFloat(inp.value) || 0;
+      const nv = Math.max(min(), parseFloat((v - step()).toFixed(10)));
+      inp.value = nv;
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
 }
 
 function loadAll() {
@@ -400,9 +439,17 @@ async function loadDashboard() {
 
     const week = currentWeek();
     const todayStr = new Date().toLocaleDateString('sv-SE'); // format YYYY-MM-DD
+    const horseSellerMap = {}; // uid -> { name, horses }
     rSnap.forEach(d => {
       const r = d.data();
       allTimeTotal += r.total || 0; // zlicz 100% ze wszystkich rachunków
+      /* Zlicz konie od początku per pracownik */
+      const horseCount = (r.lines || []).filter(l => l.isHorse).reduce((s, l) => s + (l.qty || 1), 0);
+      if (horseCount > 0) {
+        const uid = r.workerUid || '__unknown__';
+        if (!horseSellerMap[uid]) horseSellerMap[uid] = { name: r.workerName || '—', horses: 0 };
+        horseSellerMap[uid].horses += horseCount;
+      }
       /* Sprzedaż dziś — porównaj datę bez strefy czasowej */
       if (r.createdAt?.toDate) {
         const rDateStr = r.createdAt.toDate().toLocaleDateString('sv-SE');
@@ -455,6 +502,13 @@ async function loadDashboard() {
 
     /* Stan kasy stajni = 100% wpływów + wpłaty do kasy − wydatki − wypłaty */
     const treasury = allTimeTotal + allTimeDeposits - allTimeExp - allTimePaid;
+
+    /* Najlepszy sprzedawca koni */
+    const topSeller = Object.values(horseSellerMap).sort((a, b) => b.horses - a.horses)[0] || null;
+    const topSellerEl = document.getElementById('stat-top-horse-seller');
+    const topCountEl  = document.getElementById('stat-top-horse-count');
+    if (topSellerEl) topSellerEl.textContent = topSeller ? topSeller.name : '—';
+    if (topCountEl)  topCountEl.textContent  = topSeller ? topSeller.horses + ' koni sprzedanych od początku' : 'brak danych';
 
     document.getElementById('stat-today').textContent       = fmt(todaySales);
     document.getElementById('stat-stable').textContent      = fmt(totalStable);
@@ -1054,6 +1108,7 @@ function renderParEditLines() {
         <span class="par-edit-row-sub" id="par-edit-sub-${idx}">${fmt(l.price * l.qty)}</span>
       </div>
     </div>`).join('');
+  initNumberInputs(el);
   parEditRecalc();
 }
 
@@ -2285,6 +2340,245 @@ document.addEventListener('keydown', e => {
     }
   }
 });
+
+/* =====================================================
+   KONIE — katalog ras
+   ===================================================== */
+const HORSE_CATALOG = {
+  'Robocze': [
+    { name:'Muły',                    price:'70–90',   zdrowie:3, wytrzymalosc:1, odwaga:5, zwinnosc:2, predkosc:1, przyspieszenie:1 },
+    { name:'Amerykański Osioł Mamut', price:'80–110',  zdrowie:4, wytrzymalosc:1, odwaga:6, zwinnosc:3, predkosc:1, przyspieszenie:1 },
+    { name:'Ardeński',                price:'150–190', zdrowie:8, wytrzymalosc:2, odwaga:7, zwinnosc:3, predkosc:1, przyspieszenie:2 },
+    { name:'Belgijski',               price:'120–150', zdrowie:8, wytrzymalosc:2, odwaga:7, zwinnosc:2, predkosc:1, przyspieszenie:2 },
+    { name:'Shire',                   price:'130–170', zdrowie:9, wytrzymalosc:2, odwaga:7, zwinnosc:2, predkosc:1, przyspieszenie:2 },
+    { name:'Suffolk Punch',           price:'120–160', zdrowie:8, wytrzymalosc:2, odwaga:6, zwinnosc:3, predkosc:1, przyspieszenie:2 },
+    { name:'Bretoński',               price:'150–180', zdrowie:8, wytrzymalosc:2, odwaga:6, zwinnosc:3, predkosc:1, przyspieszenie:2 },
+    { name:'Fryzyjski',               price:'270–340', zdrowie:7, wytrzymalosc:2, odwaga:7, zwinnosc:5, predkosc:1, przyspieszenie:4 },
+    { name:'Clydesdale',              price:'150–170', zdrowie:8, wytrzymalosc:2, odwaga:6, zwinnosc:3, predkosc:1, przyspieszenie:2 },
+    { name:'Black Forest',            price:'210–260', zdrowie:6, wytrzymalosc:2, odwaga:7, zwinnosc:4, predkosc:1, przyspieszenie:3 },
+    { name:'Haflinger',               price:'190–220', zdrowie:6, wytrzymalosc:2, odwaga:6, zwinnosc:5, predkosc:1, przyspieszenie:3 },
+    { name:'Koń Kanadyjski',          price:'200–230', zdrowie:7, wytrzymalosc:2, odwaga:7, zwinnosc:5, predkosc:1, przyspieszenie:3 },
+    { name:'Cob Irlandzki',           price:'200–240', zdrowie:8, wytrzymalosc:2, odwaga:7, zwinnosc:4, predkosc:1, przyspieszenie:2 },
+    { name:'Harlekin',                price:'180–210', zdrowie:7, wytrzymalosc:2, odwaga:6, zwinnosc:4, predkosc:1, przyspieszenie:3 },
+    { name:'Comtois',                 price:'170–200', zdrowie:8, wytrzymalosc:2, odwaga:7, zwinnosc:3, predkosc:1, przyspieszenie:2 },
+    { name:'Warlander',               price:'180–200', zdrowie:7, wytrzymalosc:2, odwaga:7, zwinnosc:4, predkosc:1, przyspieszenie:3 },
+  ],
+  'Wierzchowce': [
+    { name:'American Paint',                price:'390–410',  zdrowie:6, wytrzymalosc:3, odwaga:6, zwinnosc:7, predkosc:3, przyspieszenie:5 },
+    { name:'Kłusak Amerykański',            price:'390–430',  zdrowie:5, wytrzymalosc:4, odwaga:5, zwinnosc:5, predkosc:4, przyspieszenie:6 },
+    { name:'Andaluzyjski',                  price:'450–500',  zdrowie:7, wytrzymalosc:3, odwaga:7, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Appaloosa',                     price:'360–390',  zdrowie:6, wytrzymalosc:3, odwaga:6, zwinnosc:6, predkosc:3, przyspieszenie:5 },
+    { name:'Criollo',                       price:'400–460',  zdrowie:7, wytrzymalosc:5, odwaga:7, zwinnosc:6, predkosc:3, przyspieszenie:4 },
+    { name:'Holenderski Koń Gorącokrwisty', price:'410–440',  zdrowie:6, wytrzymalosc:4, odwaga:6, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Węgierski Półkrwi',             price:'395–430',  zdrowie:6, wytrzymalosc:4, odwaga:7, zwinnosc:6, predkosc:3, przyspieszenie:4 },
+    { name:'Kentucky Saddle',               price:'360–380',  zdrowie:5, wytrzymalosc:3, odwaga:5, zwinnosc:6, predkosc:4, przyspieszenie:5 },
+    { name:'Kladruber',                     price:'440–460',  zdrowie:7, wytrzymalosc:3, odwaga:6, zwinnosc:4, predkosc:3, przyspieszenie:4 },
+    { name:'Missouri Fox Trotter',          price:'490–530',  zdrowie:6, wytrzymalosc:5, odwaga:6, zwinnosc:6, predkosc:4, przyspieszenie:6 },
+    { name:'Morgan',                        price:'390–400',  zdrowie:5, wytrzymalosc:3, odwaga:6, zwinnosc:6, predkosc:3, przyspieszenie:4 },
+    { name:'Mustang',                       price:'440–470',  zdrowie:6, wytrzymalosc:5, odwaga:8, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Fjord',                         price:'400–430',  zdrowie:7, wytrzymalosc:4, odwaga:7, zwinnosc:4, predkosc:3, przyspieszenie:3 },
+    { name:'Tiger Horse',                   price:'420–450',  zdrowie:6, wytrzymalosc:3, odwaga:6, zwinnosc:6, predkosc:4, przyspieszenie:5 },
+    { name:'American Quarter Horse',        price:'530–570',  zdrowie:6, wytrzymalosc:4, odwaga:7, zwinnosc:8, predkosc:4, przyspieszenie:7 },
+    { name:'Colorado Ranger',               price:'590–630',  zdrowie:6, wytrzymalosc:3, odwaga:6, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Rocky Mountain Horse',          price:'520–560',  zdrowie:6, wytrzymalosc:4, odwaga:6, zwinnosc:6, predkosc:3, przyspieszenie:4 },
+    { name:'Tennessee Walker',              price:'430–450',  zdrowie:5, wytrzymalosc:4, odwaga:5, zwinnosc:5, predkosc:4, przyspieszenie:5 },
+    { name:'Norfolk Roadster',              price:'550–600',  zdrowie:5, wytrzymalosc:3, odwaga:6, zwinnosc:6, predkosc:4, przyspieszenie:5 },
+    { name:'Oldenburski',                   price:'530–580',  zdrowie:6, wytrzymalosc:4, odwaga:6, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Koń Holsztyński',               price:'600–670',  zdrowie:6, wytrzymalosc:4, odwaga:6, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Selle Francais',                price:'600–665',  zdrowie:6, wytrzymalosc:4, odwaga:6, zwinnosc:8, predkosc:4, przyspieszenie:5 },
+    { name:'Koń Minorkański',               price:'550–590',  zdrowie:6, wytrzymalosc:3, odwaga:7, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Lipicański',                    price:'550–570',  zdrowie:6, wytrzymalosc:3, odwaga:7, zwinnosc:6, predkosc:3, przyspieszenie:4 },
+    { name:'Cleveland Bay',                 price:'510–550',  zdrowie:7, wytrzymalosc:4, odwaga:6, zwinnosc:5, predkosc:3, przyspieszenie:4 },
+    { name:'Murgese',                       price:'540–590',  zdrowie:7, wytrzymalosc:4, odwaga:7, zwinnosc:6, predkosc:3, przyspieszenie:4 },
+    { name:'Kuc Islandzki',                 price:'540–570',  zdrowie:6, wytrzymalosc:5, odwaga:7, zwinnosc:5, predkosc:3, przyspieszenie:4 },
+    { name:'Koń Luzytański',                price:'590–620',  zdrowie:6, wytrzymalosc:4, odwaga:7, zwinnosc:8, predkosc:4, przyspieszenie:6 },
+    { name:'Paso Fino',                     price:'560–590',  zdrowie:5, wytrzymalosc:3, odwaga:5, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+    { name:'Camargue',                      price:'570–590',  zdrowie:6, wytrzymalosc:4, odwaga:7, zwinnosc:5, predkosc:3, przyspieszenie:4 },
+    { name:'Amerykański Koń Wierzchowy',    price:'550–570',  zdrowie:5, wytrzymalosc:3, odwaga:5, zwinnosc:7, predkosc:4, przyspieszenie:5 },
+  ],
+  'Wyścigowe': [
+    { name:'Arabski',                       price:'1050–1200', zdrowie:5, wytrzymalosc:7, odwaga:6, zwinnosc:8, predkosc:6, przyspieszenie:8 },
+    { name:'Koń Pełnej Krwi Angielskiej',   price:'1200–1400', zdrowie:4, wytrzymalosc:5, odwaga:5, zwinnosc:8, predkosc:8, przyspieszenie:9 },
+    { name:'Turkmeński',                    price:'990–1050',  zdrowie:7, wytrzymalosc:5, odwaga:7, zwinnosc:8, predkosc:6, przyspieszenie:8 },
+    { name:'Nez Perce',                     price:'970–1000',  zdrowie:6, wytrzymalosc:5, odwaga:7, zwinnosc:8, predkosc:5, przyspieszenie:7 },
+    { name:'Pintabian',                     price:'1000–1100', zdrowie:5, wytrzymalosc:7, odwaga:6, zwinnosc:8, predkosc:6, przyspieszenie:8 },
+    { name:'AraAppaloosa',                  price:'950–990',   zdrowie:6, wytrzymalosc:5, odwaga:6, zwinnosc:8, predkosc:5, przyspieszenie:7 },
+    { name:'Kłusak Francuski',              price:'930–970',   zdrowie:5, wytrzymalosc:5, odwaga:5, zwinnosc:7, predkosc:5, przyspieszenie:7 },
+    { name:'Achał-Tekiński',                price:'1100–1200', zdrowie:5, wytrzymalosc:7, odwaga:7, zwinnosc:8, predkosc:6, przyspieszenie:8 },
+  ],
+  'Kuce': [
+    { name:'Kuc Szetlandzki', price:'200–230', zdrowie:7, wytrzymalosc:3, odwaga:7, zwinnosc:5, predkosc:1, przyspieszenie:2 },
+    { name:'Kuc Walijski',    price:'270–300', zdrowie:5, wytrzymalosc:2, odwaga:6, zwinnosc:7, predkosc:3, przyspieszenie:6 },
+    { name:'Merens',          price:'250–290', zdrowie:6, wytrzymalosc:3, odwaga:7, zwinnosc:5, predkosc:2, przyspieszenie:3 },
+    { name:'Exmoor',          price:'220–250', zdrowie:6, wytrzymalosc:3, odwaga:7, zwinnosc:5, predkosc:2, przyspieszenie:2 },
+    { name:'Connemara',       price:'290–320', zdrowie:6, wytrzymalosc:3, odwaga:7, zwinnosc:7, predkosc:2, przyspieszenie:4 },
+    { name:'Cob Walijski',    price:'300–350', zdrowie:7, wytrzymalosc:3, odwaga:7, zwinnosc:6, predkosc:3, przyspieszenie:5 },
+  ],
+  'Egzotyczne': [
+    { name:'Marna Szkapa', price:'40–45',  zdrowie:1, wytrzymalosc:1, odwaga:1, zwinnosc:1, predkosc:1, przyspieszenie:1 },
+    { name:'Osioł',        price:'50',     zdrowie:3, wytrzymalosc:2, odwaga:5, zwinnosc:2, predkosc:1, przyspieszenie:1 },
+    { name:'Przewalski',   price:'225',    zdrowie:5, wytrzymalosc:3, odwaga:5, zwinnosc:4, predkosc:3, przyspieszenie:3 },
+  ],
+};
+
+const HORSE_CAT_ICONS = {
+  'Robocze':    '🐴',
+  'Wierzchowce':'🏇',
+  'Wyścigowe':  '🏆',
+  'Kuce':       '🐎',
+  'Egzotyczne': '🌟',
+};
+let _activeCat   = 'Robocze';
+let _horseSortStats = []; // max 2 klucze cech, sortowanie po sumie
+
+function _horseStatBar(label, val, highlighted) {
+  const pct = Math.round((val || 0) / 10 * 100);
+  const hl  = !!highlighted;
+  return `<div class="horse-stat${hl ? ' horse-stat--hl' : ''}">
+    <span class="horse-stat-label">${label}</span>
+    <div class="horse-stat-bar"><div class="horse-stat-fill${hl ? ' horse-stat-fill--hl' : ''}" style="width:${pct}%"></div></div>
+    <span class="horse-stat-val${hl ? ' horse-stat-val--hl' : ''}">${val}/10</span>
+  </div>`;
+}
+
+/* Zwraca wszystkie konie ze wszystkich kategorii jako płaską listę { ...h, _cat } */
+function _allHorses() {
+  return Object.entries(HORSE_CATALOG).flatMap(([cat, list]) =>
+    list.map(h => ({ ...h, _cat: cat }))
+  );
+}
+
+/* Parsuje widełki ceny "400–460" → max wartość (460), obsługuje też "50" */
+function _parseMaxPrice(priceStr) {
+  const parts = String(priceStr).split(/[–\-]/);
+  return parseInt(parts[parts.length - 1], 10) || 0;
+}
+
+window.renderHorsesPage = function() {
+  const catEl  = document.getElementById('horses-categories');
+  const gridEl = document.getElementById('horses-grid');
+  if (!catEl || !gridEl) return;
+
+  const filterActive = _isFilterActive();
+
+  /* Przyciski kategorii — schowaj gdy aktywny filtr */
+  catEl.style.display = filterActive ? 'none' : '';
+  catEl.innerHTML = Object.keys(HORSE_CATALOG).map(cat => `
+    <button class="horses-cat-btn ${cat === _activeCat ? 'active' : ''}"
+      onclick="selectHorseCat('${cat}')">
+      ${HORSE_CAT_ICONS[cat] || '🐎'} ${cat}
+    </button>`).join('');
+
+  let horses;
+  if (filterActive) {
+    horses = _allHorses();
+  } else {
+    horses = (HORSE_CATALOG[_activeCat] || []).map(h => ({ ...h, _cat: _activeCat }));
+  }
+
+  /* Filtr nazwy */
+  const nameVal = (document.getElementById('hf-name')?.value || '').trim().toLowerCase();
+  if (nameVal) horses = horses.filter(h => h.name.toLowerCase().includes(nameVal));
+
+  /* Filtr ceny max */
+  const priceMax = parseInt(document.getElementById('hf-price')?.value || '', 10);
+  if (!isNaN(priceMax) && priceMax > 0) {
+    horses = horses.filter(h => _parseMaxPrice(h.price) <= priceMax);
+  }
+
+  /* Filtr kategorii w trybie wyszukiwania */
+  const catVal = document.getElementById('hf-cat')?.value || '';
+  if (catVal) horses = horses.filter(h => h._cat === catVal);
+
+  /* Sortowanie wg 1 lub 2 cech — suma malejąco */
+  if (_horseSortStats.length) {
+    horses = [...horses].sort((a, b) => {
+      const sumB = _horseSortStats.reduce((s, k) => s + (b[k] || 0), 0);
+      const sumA = _horseSortStats.reduce((s, k) => s + (a[k] || 0), 0);
+      return sumB - sumA;
+    });
+  }
+
+  /* Podświetl przyciski sortowania — numeruj kolejność wyboru */
+  document.querySelectorAll('.hf-sort-btn').forEach(btn => {
+    const idx = _horseSortStats.indexOf(btn.dataset.stat);
+    btn.classList.toggle('active', idx !== -1);
+    const badge = btn.querySelector('.sort-order-badge');
+    if (badge) badge.remove();
+    if (idx !== -1 && _horseSortStats.length === 2) {
+      btn.insertAdjacentHTML('beforeend', `<span class="sort-order-badge">${idx + 1}</span>`);
+    }
+  });
+
+  /* Wyniki */
+  const resEl = document.getElementById('hf-results');
+  if (resEl) {
+    let txt = filterActive ? `Znaleziono: ${horses.length} ${horses.length === 1 ? 'koń' : horses.length < 5 ? 'konie' : 'koni'}` : '';
+    if (_horseSortStats.length === 2) txt += ' · sortowanie: suma obu cech';
+    resEl.textContent = txt;
+  }
+
+  if (!horses.length) {
+    gridEl.innerHTML = `<div style="font-family:var(--font-type);color:var(--dust);padding:1.5rem;grid-column:1/-1">Brak koni spełniających kryteria.</div>`;
+    return;
+  }
+
+  gridEl.innerHTML = horses.map(h => `
+    <div class="horse-card">
+      ${filterActive ? `<div class="horse-card-cat">${HORSE_CAT_ICONS[h._cat] || '🐎'} ${h._cat}</div>` : ''}
+      <div class="horse-card-name">${h.name}</div>
+      <div class="horse-card-price">💰 ${h.price} $</div>
+      <div class="horse-stats">
+        ${_horseStatBar('❤️ Zdrowie',        h.zdrowie,        _horseSortStats.includes('zdrowie'))}
+        ${_horseStatBar('💪 Wytrzymałość',   h.wytrzymalosc,   _horseSortStats.includes('wytrzymalosc'))}
+        ${_horseStatBar('🦁 Odwaga',         h.odwaga,         _horseSortStats.includes('odwaga'))}
+        ${_horseStatBar('🌀 Zwinność',       h.zwinnosc,       _horseSortStats.includes('zwinnosc'))}
+        ${_horseStatBar('💨 Prędkość',       h.predkosc,       _horseSortStats.includes('predkosc'))}
+        ${_horseStatBar('⚡ Przyspieszenie', h.przyspieszenie, _horseSortStats.includes('przyspieszenie'))}
+      </div>
+    </div>`).join('');
+};
+
+function _isFilterActive() {
+  const name  = (document.getElementById('hf-name')?.value  || '').trim();
+  const price = (document.getElementById('hf-price')?.value || '').trim();
+  const cat   = (document.getElementById('hf-cat')?.value   || '');
+  return !!(name || price || cat || _horseSortStats.length);
+}
+
+window.selectHorseCat = function(cat) {
+  _activeCat = cat;
+  window.renderHorsesPage();
+};
+
+window.applyHorseFilters = function() {
+  window.renderHorsesPage();
+};
+
+window.toggleHorseSort = function(stat) {
+  const idx = _horseSortStats.indexOf(stat);
+  if (idx !== -1) {
+    /* Odznacz */
+    _horseSortStats.splice(idx, 1);
+  } else if (_horseSortStats.length < 2) {
+    /* Dodaj (max 2) */
+    _horseSortStats.push(stat);
+  } else {
+    /* Już 2 zaznaczone — zamień starszą (pierwszą) na nową */
+    _horseSortStats = [_horseSortStats[1], stat];
+  }
+  window.renderHorsesPage();
+};
+
+window.resetHorseFilters = function() {
+  document.getElementById('hf-name').value  = '';
+  document.getElementById('hf-price').value = '';
+  document.getElementById('hf-cat').value   = '';
+  _horseSortStats = [];
+  window.renderHorsesPage();
+};
+
+
 
 
 
