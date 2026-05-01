@@ -375,6 +375,7 @@ window.goTo = function(section, el) {
   el?.classList.add('active');
   /* Odśwież tablicę przy każdym wejściu */
   if (section === 'dashboard') loadDashboard();
+  if (section === 'payroll')   loadPayroll();
   /* Oznacz jako przeczytane — usuń badge powiadomienia */
   if (section === 'notes' || section === 'instructions') {
     localStorage.setItem('lastSeen_' + section, Date.now().toString());
