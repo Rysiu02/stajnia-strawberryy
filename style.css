@@ -528,6 +528,16 @@ main {
 .stat-card--treasury .stat-card-label { color: var(--gold); }
 .stat-card--treasury .stat-card-value { font-size: 1.75rem; }
 
+/* Kafelek faktycznej gotówki w kasie */
+.stat-card--cashbox {
+  border-color: rgba(106,191,126,0.55);
+  background: linear-gradient(135deg, rgba(8,32,14,0.93), rgba(4,16,8,0.97));
+  box-shadow: 0 0 18px rgba(106,191,126,0.12), inset 0 0 30px rgba(0,0,0,0.3);
+}
+.stat-card--cashbox::before { opacity: 0.6; background: linear-gradient(90deg, transparent, #6abf7e, transparent); }
+.stat-card--cashbox .stat-card-label { color: #6abf7e; }
+.stat-card--cashbox .stat-card-value { font-size: 1.75rem; }
+
 /* Kafelek najlepszego sprzedawcy koni */
 .stat-card--topseller {
   border-color: rgba(106,191,126,0.5);

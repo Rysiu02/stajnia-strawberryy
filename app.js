@@ -373,6 +373,8 @@ window.goTo = function(section, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + section)?.classList.add('active');
   el?.classList.add('active');
+  /* Odśwież tablicę przy każdym wejściu */
+  if (section === 'dashboard') loadDashboard();
   /* Oznacz jako przeczytane — usuń badge powiadomienia */
   if (section === 'notes' || section === 'instructions') {
     localStorage.setItem('lastSeen_' + section, Date.now().toString());
@@ -442,7 +444,8 @@ async function loadDashboard() {
     /* Rachunki — wszystkie, filtrujemy po miesiącu w JS */
     const rSnap = await getDocs(collection(db,'receipts'));
     let totalSales=0, totalStable=0, totalWorkers=0;
-    let allTimeTotal=0; // łączna kwota wszystkich rachunków (100%) — stajnia fizycznie trzyma całą gotówkę
+    let allTimeTotal=0;  // łączna kwota wszystkich rachunków (100%)
+    let allTimeStable=0; // łączna zakładka stajni (50%) od początku
     let todaySales=0;   // tylko dzisiejsze rachunki
     const workerMap = {};
     const recentRows = [];
@@ -452,7 +455,8 @@ async function loadDashboard() {
     const horseSellerMap = {}; // uid -> { name, horses }
     rSnap.forEach(d => {
       const r = d.data();
-      allTimeTotal += r.total || 0; // zlicz 100% ze wszystkich rachunków
+      allTimeTotal  += r.total  || 0; // zlicz 100% ze wszystkich rachunków
+      allTimeStable += r.stable || 0; // zlicz zakładkę stajni (50%) od początku
       /* Zlicz konie od początku per pracownik */
       const horseCount = (r.lines || []).filter(l => l.isHorse).reduce((s, l) => s + (l.qty || 1), 0);
       if (horseCount > 0) {
@@ -510,8 +514,14 @@ async function loadDashboard() {
       });
     } catch(_) { /* kolekcja jeszcze nie istnieje */ }
 
-    /* Stan kasy stajni = 100% wpływów + wpłaty do kasy − wydatki − wypłaty */
-    const treasury = allTimeTotal + allTimeDeposits - allTimeExp - allTimePaid;
+    /* Stan kasy stajni = łączne zarobki od początku (100%), nic nie odejmowane */
+    const treasury = allTimeTotal;
+
+    /* Zakładka stajni (netto) = 50% zarobków od początku + wpłaty do kasy − wydatki */
+    const stableNet = allTimeStable + allTimeDeposits - allTimeExp;
+
+    /* Gotówka w kasie = 100% przychodów + wpłaty − wydatki − wypłaty pracownikom */
+    const cashbox = allTimeTotal + allTimeDeposits - allTimeExp - allTimePaid;
 
     /* Najlepszy sprzedawca koni */
     const topSeller = Object.values(horseSellerMap).sort((a, b) => b.horses - a.horses)[0] || null;
@@ -521,12 +531,21 @@ async function loadDashboard() {
     if (topCountEl)  topCountEl.textContent  = topSeller ? topSeller.horses + ' koni sprzedanych od początku' : 'brak danych';
 
     document.getElementById('stat-today').textContent       = fmt(todaySales);
-    document.getElementById('stat-stable').textContent      = fmt(totalStable);
     document.getElementById('stat-workers-tab').textContent = fmt(totalWorkers);
+    const sEl = document.getElementById('stat-stable');
+    if (sEl) {
+      sEl.textContent = fmt(stableNet);
+      sEl.style.color = stableNet >= 0 ? 'var(--amber)' : '#c94040';
+    }
     const tEl = document.getElementById('stat-treasury');
     if (tEl) {
       tEl.textContent = fmt(treasury);
-      tEl.style.color = treasury >= 0 ? 'var(--pale-gold)' : '#c94040';
+      tEl.style.color = 'var(--pale-gold)';
+    }
+    const cbEl = document.getElementById('stat-cashbox');
+    if (cbEl) {
+      cbEl.textContent = fmt(cashbox);
+      cbEl.style.color = cashbox >= 0 ? '#a0e8b0' : '#c94040';
     }
 
     /* Tabela zakładek */
