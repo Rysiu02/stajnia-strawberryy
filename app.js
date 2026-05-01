@@ -619,7 +619,7 @@ function renderHorseTiles() {
   if (!el) return;
   const horses = [
     { id:'kon_do300',      name:'Koń do 300$',      icon:'🐴', fee:25, desc:'+ 25$ prowizji' },
-    { id:'kon_400_700',    name:'Koń 400–700$',      icon:'🐎', fee:30, desc:'+ 30$ prowizji' },
+    { id:'kon_400_700',    name:'Koń 300–700$',      icon:'🐎', fee:30, desc:'+ 30$ prowizji' },
     { id:'kon_powyzej700', name:'Koń powyżej 700$',  icon:'🏇', fee:40, desc:'+ 40$ prowizji' },
   ];
   el.innerHTML = horses.map(h => `
