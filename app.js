@@ -11,7 +11,7 @@ import {
 import {
   getFirestore,
   doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
-  collection, query, orderBy, serverTimestamp
+  collection, query, orderBy, serverTimestamp, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 /* =====================================================
@@ -169,9 +169,11 @@ function isOwnerLevel() {
 }
 const fmt  = n => (Math.round((n||0)*100)/100).toLocaleString('pl-PL',
   { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' $';
-const fmtD = ts => ts?.toDate
-  ? ts.toDate().toLocaleDateString('pl-PL', { day:'numeric', month:'short', year:'numeric' })
-  : '—';
+const fmtD = ts => {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : (ts.seconds != null ? new Date(ts.seconds * 1000) : null);
+  return d ? d.toLocaleDateString('pl-PL', { day:'numeric', month:'short', year:'numeric' }) : '—';
+};
 function currentMonth() { return new Date().toISOString().slice(0,7); }
 
 /* Rozliczenia tygodniowe — zwraca string "RRRR-Wnn" np. "2025-W18" (ISO 8601) */
@@ -353,6 +355,7 @@ function showLoginErr(msg) {
   e.textContent = '⚠ ' + msg; e.style.display = 'block';
 }
 window.doLogout = async function() {
+  if (_receiptsUnsubscribe) { _receiptsUnsubscribe(); _receiptsUnsubscribe = null; }
   await signOut(auth);
   // onAuthStateChanged wywoła showLogin() → public-screen
 };
@@ -907,6 +910,7 @@ async function loadReceiptWorkers() {
    ===================================================== */
 let _receiptsCache = [];    // cache rachunków dla bieżącego miesiąca
 let _receiptsCacheMonth = null;
+let _receiptsUnsubscribe = null; // nasłuchiwacz onSnapshot
 
 function renderReceiptsTable(rows) {
   const tbody = document.getElementById('receipts-history-body');
@@ -964,7 +968,7 @@ window.selectReceiptMonth = function(month) {
   loadReceiptsHistory();
 };
 
-window.loadReceiptsHistory = async function() {
+window.loadReceiptsHistory = function() {
   const month = document.getElementById('receipts-filter-month')?.value || currentMonth();
 
   /* Podświetl aktywny miesiąc w nawigacji */
@@ -975,11 +979,13 @@ window.loadReceiptsHistory = async function() {
   const tbody = document.getElementById('receipts-history-body');
   if (!tbody) return;
 
-  /* Pobierz z bazy tylko gdy zmienił się miesiąc */
+  /* Jeśli miesiąc się zmienił — anuluj stary nasłuchiwacz i zacznij nowy */
   if (month !== _receiptsCacheMonth) {
+    if (_receiptsUnsubscribe) { _receiptsUnsubscribe(); _receiptsUnsubscribe = null; }
+    _receiptsCacheMonth = month;
     tbody.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:1rem">Ładowanie...</td></tr>';
-    try {
-      const snap = await getDocs(collection(db,'receipts'));
+
+    _receiptsUnsubscribe = onSnapshot(collection(db, 'receipts'), (snap) => {
       let rows = [];
       snap.forEach(d => {
         const r = d.data();
@@ -989,11 +995,16 @@ window.loadReceiptsHistory = async function() {
       });
       rows.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
       _receiptsCache = rows;
-      _receiptsCacheMonth = month;
-    } catch(e) { console.error('Receipts history:', e); showToast('❌ Błąd ładowania rachunków'); return; }
+      /* Zastosuj aktywny filtr klienta */
+      const search = (document.getElementById('receipts-search-client')?.value || '').trim().toLowerCase();
+      const filtered = search ? _receiptsCache.filter(r => (r.client||'').toLowerCase().includes(search)) : _receiptsCache;
+      renderReceiptsTable(filtered);
+    }, (e) => { console.error('Receipts history:', e); showToast('❌ Błąd ładowania rachunków'); });
+
+    return;
   }
 
-  /* Zastosuj aktywny filtr klienta */
+  /* Ten sam miesiąc — tylko przelicz filtr (nasłuchiwacz już aktywny) */
   const search = (document.getElementById('receipts-search-client')?.value || '').trim().toLowerCase();
   const filtered = search ? _receiptsCache.filter(r => (r.client||'').toLowerCase().includes(search)) : _receiptsCache;
   renderReceiptsTable(filtered);
