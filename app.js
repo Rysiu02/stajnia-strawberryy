@@ -303,6 +303,7 @@ function initNumberInputs(root) {
 }
 
 function loadAll() {
+  buildMonthsNav();
   loadDashboard();
   loadReceiptsHistory();
   loadExpenses();
@@ -402,6 +403,12 @@ function applyRoleRestrictions() {
     item.style.opacity   = blocked ? '0.35' : '1';
     item.title           = blocked ? 'Brak dostępu' : '';
     item.dataset.blocked = blocked ? 'true' : 'false';
+  });
+
+  document.querySelectorAll('.nav-item[data-hide-below]').forEach(item => {
+    const min    = item.dataset.hideBelow;
+    const hidden = ROLE_LEVEL[min] > lvl;
+    item.style.display = hidden ? 'none' : '';
   });
 
   // Panel dodawania wydatków — tylko owner/deputy
@@ -808,6 +815,8 @@ window.clearReceipt = function() {
 
 window.saveReceipt = async function() {
   if (!basket.length) { showToast('⚠ Koszyk jest pusty'); return; }
+  const _clientCheck = document.getElementById('rec-client').value.trim();
+  if (!_clientCheck) { showToast('⚠ Podaj imię klienta'); document.getElementById('rec-client').focus(); return; }
 
   const lines  = basket.map(i => ({ name: i.name, icon: i.icon, price: i.price, qty: i.qty, subtotal: i.price*i.qty, isHorse: !!i.isHorse }));
   const total  = lines.reduce((s,l) => s+l.subtotal, 0);
@@ -927,8 +936,42 @@ window.filterReceiptsClient = function() {
   renderReceiptsTable(_receiptsCache.filter(r => (r.client||'').toLowerCase().includes(search)));
 };
 
+function buildMonthsNav() {
+  const el = document.getElementById('receipts-months-nav');
+  if (!el) return;
+  const now = new Date();
+  const active = document.getElementById('receipts-filter-month')?.value || currentMonth();
+  const start = new Date(2026, 3, 1); // kwiecień 2026
+  const months = [];
+  let d = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (d >= start) {
+    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    months.push({ val, label });
+    d = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  }
+  months.reverse();
+  el.innerHTML = months.map(m => `
+    <button class="rmn-btn ${m.val === active ? 'active' : ''}" data-month="${m.val}"
+      onclick="selectReceiptMonth('${m.val}')">
+      ${m.label}
+    </button>`).join('');
+}
+
+window.selectReceiptMonth = function(month) {
+  const inp = document.getElementById('receipts-filter-month');
+  if (inp) inp.value = month;
+  loadReceiptsHistory();
+};
+
 window.loadReceiptsHistory = async function() {
   const month = document.getElementById('receipts-filter-month')?.value || currentMonth();
+
+  /* Podświetl aktywny miesiąc w nawigacji */
+  document.querySelectorAll('.rmn-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.month === month);
+  });
+
   const tbody = document.getElementById('receipts-history-body');
   if (!tbody) return;
 
@@ -1176,6 +1219,7 @@ window.saveReceiptEdits = async function() {
   const workerName  = workerEntry?.displayName || r.workerName;
 
   const client = document.getElementById('par-edit-client').value.trim();
+  if (!client) { showToast('⚠ Podaj imię klienta'); document.getElementById('par-edit-client').focus(); return; }
   const note   = document.getElementById('par-edit-note').value.trim();
 
   try {
@@ -2453,6 +2497,18 @@ function _parseMaxPrice(priceStr) {
   const parts = String(priceStr).split(/[–\-]/);
   return parseInt(parts[parts.length - 1], 10) || 0;
 }
+/* Parsuje widełki ceny "400–460" → min wartość (400), obsługuje też "50" */
+function _parseMinPrice(priceStr) {
+  const parts = String(priceStr).split(/[–\-]/);
+  return parseInt(parts[0], 10) || 0;
+}
+/* Prowizja na podstawie ceny minimalnej */
+function _horseCommission(priceStr) {
+  const min = _parseMinPrice(priceStr);
+  if (min < 300)       return '+25$ prowizji';
+  if (min <= 700)      return '+30$ prowizji';
+  return '+40$ prowizji';
+}
 
 window.renderHorsesPage = function() {
   const catEl  = document.getElementById('horses-categories');
@@ -2480,10 +2536,10 @@ window.renderHorsesPage = function() {
   const nameVal = (document.getElementById('hf-name')?.value || '').trim().toLowerCase();
   if (nameVal) horses = horses.filter(h => h.name.toLowerCase().includes(nameVal));
 
-  /* Filtr ceny max */
+  /* Filtr ceny max — pokazuj konie których cena minimalna mieści się w budżecie */
   const priceMax = parseInt(document.getElementById('hf-price')?.value || '', 10);
   if (!isNaN(priceMax) && priceMax > 0) {
-    horses = horses.filter(h => _parseMaxPrice(h.price) <= priceMax);
+    horses = horses.filter(h => _parseMinPrice(h.price) <= priceMax);
   }
 
   /* Filtr kategorii w trybie wyszukiwania */
@@ -2525,8 +2581,13 @@ window.renderHorsesPage = function() {
 
   gridEl.innerHTML = horses.map(h => `
     <div class="horse-card">
-      ${filterActive ? `<div class="horse-card-cat">${HORSE_CAT_ICONS[h._cat] || '🐎'} ${h._cat}</div>` : ''}
-      <div class="horse-card-name">${h.name}</div>
+      <div class="horse-card-header">
+        <div>
+          ${filterActive ? `<div class="horse-card-cat">${HORSE_CAT_ICONS[h._cat] || '🐎'} ${h._cat}</div>` : ''}
+          <div class="horse-card-name">${h.name}</div>
+        </div>
+        <div class="horse-commission">${_horseCommission(h.price)}</div>
+      </div>
       <div class="horse-card-price">💰 ${h.price} $</div>
       <div class="horse-stats">
         ${_horseStatBar('❤️ Zdrowie',        h.zdrowie,        _horseSortStats.includes('zdrowie'))}

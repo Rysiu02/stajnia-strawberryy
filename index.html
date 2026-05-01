@@ -91,7 +91,7 @@
     <div class="nav-item" onclick="goTo('pricelist',this)">
       <span class="nav-icon">💲</span> Cennik
     </div>
-    <div class="nav-item" onclick="goTo('horses',this);renderHorsesPage()">
+    <div class="nav-item" data-hide-below="worker" onclick="goTo('horses',this);renderHorsesPage()">
       <span class="nav-icon">🐎</span> Konie
     </div>
 
@@ -240,8 +240,8 @@
 
           <div class="form-grid form-grid-2" style="margin-bottom:1.5rem">
             <div class="form-group">
-              <label>Klient (opcjonalnie)</label>
-              <input class="form-input" id="rec-client" type="text" placeholder="Imię klienta..."/>
+              <label>Klient</label>
+              <input class="form-input" id="rec-client" type="text" placeholder="Imię klienta..." required/>
             </div>
             <div class="form-group">
               <label>Uwagi</label>
@@ -300,6 +300,18 @@
           <div style="margin-top:1rem;display:flex;gap:0.75rem">
             <button class="btn btn-primary" id="rec-save-btn" onclick="saveReceipt()">💾 Zapisz rachunek</button>
             <button class="btn btn-ghost"   onclick="clearReceipt()">Wyczyść koszyk</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Poprzednie miesiące -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📅 Przeglądaj miesiące</div>
+        </div>
+        <div class="panel-body">
+          <div id="receipts-months-nav" class="receipts-months-nav">
+            <!-- generowane przez JS -->
           </div>
         </div>
       </div>
