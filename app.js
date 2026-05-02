@@ -73,15 +73,15 @@ const ROLE_LEVEL = { viewer: 0, worker: 1, deputy: 2, technik: 2, owner: 2 };
 /* Pozycje cennika — używane w rachunkach */
 const CATALOG = [
   /* === USŁUGI === */
-  { id:'trening',     name:'Trening',                  cat:'Usługi',   icon:'🐴',                  img:null,                      price:15,   unit:'szt.' },
+  { id:'trening',     name:'Trening',                  cat:'Usługi',   icon:'🐴',                  img:null,                      price:20,   unit:'szt.' },
   /* === PRODUKTY === */
-  { id:'szczotka',    name:'Szczotka',                  cat:'Produkty', icon:'🪮',                  img:'img/szczotka.png',        price:7,    unit:'szt.' },
-  { id:'kopystka',    name:'Kopystka',                  cat:'Produkty', icon:'🔧',                  img:'img/kopystka.png',        price:17,   unit:'szt.' },
-  { id:'otrzezwiacz', name:'Otrzeźwiacz dla konia',     cat:'Produkty', icon:'💊',                  img:'img/otrzezwiacz.png',     price:31,   unit:'szt.' },
-  { id:'masc',        name:'Maść dla konia',            cat:'Produkty', icon:'🧴',                  img:'img/masc.png',            price:21,   unit:'szt.' },
+  { id:'szczotka',    name:'Szczotka',                  cat:'Produkty', icon:'🪮',                  img:'img/szczotka.png',        price:10,   unit:'szt.' },
+  { id:'kopystka',    name:'Kopystka',                  cat:'Produkty', icon:'🔧',                  img:'img/kopystka.png',        price:18,   unit:'szt.' },
+  { id:'otrzezwiacz', name:'Lekarstwo dla konia',       cat:'Produkty', icon:'💊',                  img:'img/otrzezwiacz.png',     price:20,   unit:'szt.' },
+  { id:'masc',        name:'Maść dla konia',            cat:'Produkty', icon:'🧴',                  img:'img/masc.png',            price:20,   unit:'szt.' },
   { id:'siano',       name:'Siano',                     cat:'Produkty', icon:'🌾',                  img:'img/siano.png',           price:2,    unit:'kg'   },
   { id:'marchewka',   name:'Marchewka',                 cat:'Produkty', icon:'🥕',                  img:'img/marchew.png',         price:2,    unit:'szt.' },
-  { id:'cukier',      name:'Cukier',                    cat:'Produkty', icon:'🍬',                  img:'img/cukier.png',          price:1.5,  unit:'kg'   },
+  { id:'cukier',      name:'Cukier',                    cat:'Produkty', icon:'🍬',                  img:'img/cukier.png',          price:2,    unit:'kg'   },
 ];
 
 /* =====================================================
@@ -618,9 +618,10 @@ function renderHorseTiles() {
   const el = document.getElementById('tiles-konie');
   if (!el) return;
   const horses = [
-    { id:'kon_do300',      name:'Koń do 300$',      icon:'🐴', fee:25, desc:'+ 25$ prowizji' },
-    { id:'kon_400_700',    name:'Koń 300–700$',      icon:'🐎', fee:30, desc:'+ 30$ prowizji' },
-    { id:'kon_powyzej700', name:'Koń powyżej 700$',  icon:'🏇', fee:40, desc:'+ 40$ prowizji' },
+    { id:'mul_osiol',      name:'Muł lub Osioł',         icon:'🫏', fee:25, desc:'+ 25$ na rachunek' },
+    { id:'kon_do300',      name:'Koń poniżej 300$',      icon:'🐴', fee:40, desc:'+ 40$ na rachunek' },
+    { id:'kon_400_700',    name:'Koń 400–700$',           icon:'🐎', fee:60, desc:'+ 60$ na rachunek' },
+    { id:'kon_powyzej700', name:'Koń powyżej 700$',       icon:'🏇', fee:90, desc:'+ 90$ na rachunek' },
   ];
   el.innerHTML = horses.map(h => `
     <div class="catalog-tile catalog-tile-horse"
@@ -2534,11 +2535,13 @@ function _parseMinPrice(priceStr) {
   return parseInt(parts[0], 10) || 0;
 }
 /* Prowizja na podstawie ceny minimalnej */
-function _horseCommission(priceStr) {
+function _horseCommission(priceStr, name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('muł') || n.includes('osioł')) return '+25$ na rachunek';
   const min = _parseMinPrice(priceStr);
-  if (min < 300)       return '+25$ prowizji';
-  if (min <= 700)      return '+30$ prowizji';
-  return '+40$ prowizji';
+  if (min < 400)       return '+40$ na rachunek';
+  if (min <= 700)      return '+60$ na rachunek';
+  return '+90$ na rachunek';
 }
 
 window.renderHorsesPage = function() {
@@ -2617,7 +2620,7 @@ window.renderHorsesPage = function() {
           ${filterActive ? `<div class="horse-card-cat">${HORSE_CAT_ICONS[h._cat] || '🐎'} ${h._cat}</div>` : ''}
           <div class="horse-card-name">${h.name}</div>
         </div>
-        <div class="horse-commission">${_horseCommission(h.price)}</div>
+        <div class="horse-commission">${_horseCommission(h.price, h.name)}</div>
       </div>
       <div class="horse-card-price">💰 ${h.price} $</div>
       <div class="horse-stats">
