@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="version" content="1979479353"/>
+  <meta name="version" content="1746403200"/>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css?v=1979479353"/>
+  <link rel="stylesheet" href="style.css?v=1979480485"/>
 </head>
 <body>
 
@@ -106,6 +106,9 @@
     </div>
     <div class="nav-item" onclick="goTo('tax',this)">
       <span class="nav-icon">📑</span> Podatek
+    </div>
+    <div class="nav-item" onclick="goTo('split',this)" data-min-role="owner">
+      <span class="nav-icon">⚖️</span> Podział
     </div>
 
     <div class="nav-divider"></div>
@@ -875,6 +878,17 @@
       <div class="horses-grid" id="horses-grid"></div>
     </section>
 
+    <!-- PODZIAŁ WYPŁAT -->
+    <section class="page-section" id="section-split">
+      <div class="page-header">
+        <div>
+          <div class="page-title">⚖️ Podział Wypłat</div>
+          <div class="page-subtitle" id="split-subtitle">Aktualny podział: ładowanie...</div>
+        </div>
+      </div>
+      <div id="split-content"></div>
+    </section>
+
   </main>
 </div>
 
@@ -1092,7 +1106,7 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=1979479353"></script>
+<script type="module" src="app.js?v=1979480485"></script>
 
 <!-- MODAL PROMOCJI -->
 <div id="promo-modal" class="modal-overlay hidden">
