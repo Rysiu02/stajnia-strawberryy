@@ -73,7 +73,50 @@ async function loadSplitRatio() {
       splitRatio.stable = d.stable ?? 50;
     }
   } catch(e) { console.warn('loadSplitRatio:', e); }
+  updateSplitLabels();
 }
+
+/* Aktualizuje wszystkie etykiety % podziału w całej aplikacji */
+function updateSplitLabels() {
+  const w = splitRatio.worker;
+  const s = splitRatio.stable;
+
+  /* Koszyk rachunku */
+  const rw = document.getElementById('rec-split-w'); if (rw) rw.textContent = w;
+  const rs = document.getElementById('rec-split-s'); if (rs) rs.textContent = s;
+
+  /* Opis pod cennikiem */
+  const rd = document.getElementById('rec-split-desc');
+  if (rd) rd.textContent = w + '% / ' + s + '%';
+  const rd2 = document.getElementById('rec-split-desc2');
+  if (rd2) {
+    if (w === s) {
+      rd2.textContent = 'Połowa trafia na zakładkę stajni, połowa na zakładkę pracownika który wystawił rachunek.';
+    } else {
+      rd2.textContent = w + '% trafia na zakładkę pracownika który wystawił rachunek, ' + s + '% na zakładkę stajni.';
+    }
+  }
+
+  /* Dashboard stat cards */
+  const dw = document.getElementById('dash-worker-pct'); if (dw) dw.textContent = w + '% ze sprzedaży';
+  const ds = document.getElementById('dash-stable-pct'); if (ds) ds.textContent = s + '% zarobków + wpłaty − wydatki';
+  const dt = document.getElementById('dash-th-zakladka'); if (dt) dt.textContent = 'Zakładka (' + w + '%)';
+
+  /* Paragon podglądu */
+  const pw = document.getElementById('par-split-w'); if (pw) pw.textContent = w;
+  const ps = document.getElementById('par-split-s'); if (ps) ps.textContent = s;
+
+  /* Paragon edycji */
+  const ew = document.getElementById('par-edit-split-w'); if (ew) ew.textContent = w;
+  const es = document.getElementById('par-edit-split-s'); if (es) es.textContent = s;
+
+  /* Tabela wypłat */
+  const pt = document.getElementById('payroll-th-zakladka'); if (pt) pt.textContent = 'Zakładka (' + w + '%)';
+
+  /* Kafelki koni — przebuduj */
+  renderHorseTiles();
+}
+
 
 function workerCutAmt(total) {
   return Math.round(total * (splitRatio.worker / 100) * 100) / 100;
@@ -646,14 +689,19 @@ function renderHorseTiles() {
     { id:'kon_400_700',    name:'Koń 400–700$',           icon:'🐎', fee:60, desc:'+ 60$ na rachunek' },
     { id:'kon_powyzej700', name:'Koń powyżej 700$',       icon:'🏇', fee:90, desc:'+ 90$ na rachunek' },
   ];
-  el.innerHTML = horses.map(h => `
+  el.innerHTML = horses.map(h => {
+    const wAmt = fmt(workerCutAmt(h.fee));
+    const sAmt = fmt(stableCutAmt(h.fee));
+    const desc = `+ ${fmt(h.fee)}$ → pracownik ${wAmt}$ / stajnia ${sAmt}$`;
+    return `
     <div class="catalog-tile catalog-tile-horse"
       onclick="addHorseDirectly('${h.id}','${h.name}',${h.fee},'${h.icon}')"
-      title="${h.desc}">
+      title="${desc}">
       <div class="catalog-tile-icon">${h.icon}</div>
       <div class="catalog-tile-name">${h.name}</div>
-      <div class="catalog-tile-price">${h.desc}</div>
-    </div>`).join('');
+      <div class="catalog-tile-price" style="font-size:0.65rem">${desc}</div>
+    </div>`;
+  }).join('');
 }
 
 window.addHorseDirectly = function(id, name, fee, icon) {
@@ -871,7 +919,8 @@ window.saveReceipt = async function() {
 
   const lines  = basket.map(i => ({ name: i.name, icon: i.icon, price: i.price, qty: i.qty, subtotal: i.price*i.qty, isHorse: !!i.isHorse }));
   const total  = lines.reduce((s,l) => s+l.subtotal, 0);
-  const half   = total / 2;
+  const wCut   = workerCutAmt(total);
+  const sCut   = stableCutAmt(total);
   const month  = currentMonth();
   const week   = currentWeek();
   const client = document.getElementById('rec-client').value.trim();
@@ -2566,6 +2615,7 @@ window.saveSplitRatio = async function() {
     await setDoc(doc(db, 'settings', 'split'), { worker: w, stable: s });
     splitRatio.worker = w;
     splitRatio.stable = s;
+    updateSplitLabels();
     showToast(`✓ Podział zapisany: ${w}% pracownik / ${s}% stajnia`);
     loadSplitSettings();
     recalcBasket();
