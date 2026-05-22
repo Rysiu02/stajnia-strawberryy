@@ -397,6 +397,8 @@ window.goTo = function(section, el) {
   /* Odśwież tablicę przy każdym wejściu */
   if (section === 'dashboard') loadDashboard();
   if (section === 'payroll')   loadPayroll();
+  if (section === 'split')     loadSplitSettings();
+  if (section === 'developer') { if (typeof loadDeveloper === 'function') loadDeveloper(); }
   /* Oznacz jako przeczytane — usuń badge powiadomienia */
   if (section === 'notes' || section === 'instructions') {
     localStorage.setItem('lastSeen_' + section, Date.now().toString());
