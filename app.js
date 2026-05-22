@@ -61,6 +61,27 @@ const functions   = getFunctions(firebaseApp, 'europe-west1');
 /* =====================================================
    STAŁE
    ===================================================== */
+/* Podział wypłat — domyślnie 50/50, ładowany z Firestore settings/split */
+let splitRatio = { worker: 50, stable: 50 };
+
+async function loadSplitRatio() {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'split'));
+    if (snap.exists()) {
+      const d = snap.data();
+      splitRatio.worker = d.worker ?? 50;
+      splitRatio.stable = d.stable ?? 50;
+    }
+  } catch(e) { console.warn('loadSplitRatio:', e); }
+}
+
+function workerCutAmt(total) {
+  return Math.round(total * (splitRatio.worker / 100) * 100) / 100;
+}
+function stableCutAmt(total) {
+  return Math.round(total * (splitRatio.stable / 100) * 100) / 100;
+}
+
 const ROLES = {
   viewer:  { label: 'Obserwator', css: 'role-viewer'  },
   worker:  { label: 'Pracownik',  css: 'role-worker'  },
@@ -716,10 +737,14 @@ window.removeFromBasket = function(idx) {
 
 function recalcBasket() {
   const total = basket.reduce((s, i) => s + i.price * i.qty, 0);
-  const half  = total / 2;
   document.getElementById('rec-total').textContent      = fmt(total);
-  document.getElementById('rec-stable-cut').textContent = fmt(half);
-  document.getElementById('rec-worker-cut').textContent = fmt(half);
+  document.getElementById('rec-stable-cut').textContent = fmt(stableCutAmt(total));
+  document.getElementById('rec-worker-cut').textContent = fmt(workerCutAmt(total));
+  /* Zaktualizuj etykiety podziału */
+  const slbl = document.getElementById('rec-split-label-stable');
+  const wlbl = document.getElementById('rec-split-label-worker');
+  if (slbl) slbl.textContent = splitRatio.stable + '%';
+  if (wlbl) wlbl.textContent = splitRatio.worker + '%';
 }
 
 /* =====================================================
@@ -866,7 +891,8 @@ window.saveReceipt = async function() {
     if (editingReceiptId) {
       /* === TRYB EDYCJI — aktualizuj istniejący dokument === */
       await updateDoc(doc(db, 'receipts', editingReceiptId), {
-        lines, total, stable: half, workerCut: half,
+        lines, total, stable: sCut, workerCut: wCut,
+      splitWorker: splitRatio.worker, splitStable: splitRatio.stable,
         client, note, month, week,
         workerUid, workerName
         /* createdAt — nie zmieniamy daty utworzenia */
@@ -875,7 +901,8 @@ window.saveReceipt = async function() {
     } else {
       /* === TRYB NOWY — dodaj dokument === */
       await addDoc(collection(db,'receipts'), {
-        lines, total, stable: half, workerCut: half,
+        lines, total, stable: sCut, workerCut: wCut,
+      splitWorker: splitRatio.worker, splitStable: splitRatio.stable,
         client, note, month, week,
         workerUid, workerName,
         createdAt: serverTimestamp()
@@ -1242,7 +1269,8 @@ window.saveReceiptEdits = async function() {
     isHorse: !!l.isHorse,
   }));
   const total = lines.reduce((s, l) => s + l.subtotal, 0);
-  const half  = total / 2;
+  const wCut  = workerCutAmt(total);
+  const sCut  = stableCutAmt(total);
 
   /* Kasjer */
   const sel = document.getElementById('par-edit-worker');
@@ -1257,8 +1285,9 @@ window.saveReceiptEdits = async function() {
   try {
     await updateDoc(doc(db, 'receipts', r._id), {
       lines, total,
-      stable: Math.round(half * 100) / 100,
-      workerCut: Math.round(half * 100) / 100,
+      stable: sCut,
+      workerCut: wCut,
+      splitWorker: splitRatio.worker, splitStable: splitRatio.stable,
       client, note,
       workerUid, workerName,
     });
@@ -2420,6 +2449,126 @@ document.addEventListener('keydown', e => {
 /* =====================================================
    KONIE — katalog ras
    ===================================================== */
+
+/* =====================================================
+   USTAWIENIA PODZIAŁU WYPŁAT
+   ===================================================== */
+window.loadSplitSettings = async function() {
+  await loadSplitRatio();
+  const sub = document.getElementById('split-subtitle');
+  if (sub) sub.textContent = `Aktualny podział: ${splitRatio.worker}% pracownik / ${splitRatio.stable}% stajnia`;
+  const el = document.getElementById('split-content');
+  if (!el) return;
+
+  const w = splitRatio.worker;
+  const s = splitRatio.stable;
+
+  el.innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">💰 Podział Wypłat</div>
+        <span class="badge badge-amber">${w}% / ${s}%</span>
+      </div>
+      <div class="panel-body">
+
+        <!-- Podgląd aktualnego podziału -->
+        <div style="margin-bottom:2rem">
+          <div style="font-family:var(--font-type);font-size:0.72rem;color:var(--dust);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:0.75rem">
+            Aktualny podział
+          </div>
+          <div style="display:flex;gap:0;height:48px;border:1px solid rgba(196,122,43,0.3);overflow:hidden;border-radius:2px">
+            <div id="split-bar-worker" style="
+              width:${w}%; background:linear-gradient(90deg,#4a8c5c,#6abf7e);
+              display:flex;align-items:center;justify-content:center;
+              font-family:var(--font-head);font-size:0.8rem;font-weight:700;color:#fff;
+              transition:width 0.4s ease;
+            ">Pracownik ${w}%</div>
+            <div id="split-bar-stable" style="
+              width:${s}%; background:linear-gradient(90deg,var(--rust),var(--amber));
+              display:flex;align-items:center;justify-content:center;
+              font-family:var(--font-head);font-size:0.8rem;font-weight:700;color:#fff;
+              transition:width 0.4s ease;
+            ">Stajnia ${s}%</div>
+          </div>
+        </div>
+
+        <!-- Suwak -->
+        <div class="form-group" style="margin-bottom:1.5rem">
+          <label>Udział pracownika: <strong id="split-worker-val" style="color:var(--pale-gold)">${w}%</strong>
+          &nbsp;→&nbsp; Stajnia: <strong id="split-stable-val" style="color:var(--amber)">${s}%</strong></label>
+          <input type="range" id="split-slider" min="10" max="90" step="5" value="${w}"
+            style="width:100%;margin-top:0.75rem;accent-color:var(--amber)"
+            oninput="onSplitSlider(this.value)"/>
+          <div style="display:flex;justify-content:space-between;font-family:var(--font-type);font-size:0.65rem;color:var(--dust);margin-top:0.25rem">
+            <span>10% pracownik</span><span>50 / 50</span><span>90% pracownik</span>
+          </div>
+        </div>
+
+        <!-- Szybkie presety -->
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
+          ${[[30,70],[40,60],[50,50],[60,40],[70,30]].map(([pw,ps]) =>
+            `<button class="btn btn-ghost" style="font-size:0.72rem;${pw===w?'border-color:var(--amber);color:var(--gold)':''}"
+              onclick="onSplitPreset(${pw})">
+              ${pw}% / ${ps}%
+            </button>`
+          ).join('')}
+        </div>
+
+        <!-- Opis efektu -->
+        <div id="split-preview" style="
+          padding:0.75rem 1rem;
+          background:rgba(196,122,43,0.06);
+          border:1px solid rgba(196,122,43,0.15);
+          font-family:var(--font-type);font-size:0.8rem;color:var(--dust);
+          line-height:1.7;margin-bottom:1.5rem
+        ">
+          ${splitPreviewText(w, s)}
+        </div>
+
+        <button class="btn btn-primary" style="width:100%" onclick="saveSplitRatio()">
+          💾 Zapisz nowy podział
+        </button>
+      </div>
+    </div>`;
+};
+
+function splitPreviewText(w, s) {
+  return `Przy rachunku za <strong style="color:var(--pale-gold)">100$</strong>:
+  pracownik otrzymuje <strong style="color:#6abf7e">${w}$</strong>,
+  stajnia <strong style="color:var(--amber)">${s}$</strong>.<br>
+  Nowy podział obowiązuje od następnego rachunku.
+  Wcześniejsze rachunki zachowują oryginalny podział.`;
+}
+
+window.onSplitSlider = function(val) {
+  val = parseInt(val);
+  const s = 100 - val;
+  document.getElementById('split-worker-val').textContent = val + '%';
+  document.getElementById('split-stable-val').textContent = s + '%';
+  document.getElementById('split-bar-worker').style.width = val + '%';
+  document.getElementById('split-bar-worker').textContent = 'Pracownik ' + val + '%';
+  document.getElementById('split-bar-stable').style.width = s + '%';
+  document.getElementById('split-bar-stable').textContent = 'Stajnia ' + s + '%';
+  document.getElementById('split-preview').innerHTML = splitPreviewText(val, s);
+};
+
+window.onSplitPreset = function(w) {
+  document.getElementById('split-slider').value = w;
+  onSplitSlider(w);
+};
+
+window.saveSplitRatio = async function() {
+  const w = parseInt(document.getElementById('split-slider').value);
+  const s = 100 - w;
+  try {
+    await setDoc(doc(db, 'settings', 'split'), { worker: w, stable: s });
+    splitRatio.worker = w;
+    splitRatio.stable = s;
+    showToast(`✓ Podział zapisany: ${w}% pracownik / ${s}% stajnia`);
+    loadSplitSettings();
+    recalcBasket();
+  } catch(e) { showToast('❌ ' + e.message); }
+};
 const HORSE_CATALOG = {
   'Robocze': [
     { name:'Muły',                    price:'70–90',   zdrowie:3, wytrzymalosc:1, odwaga:5, zwinnosc:2, predkosc:1, przyspieszenie:1 },
@@ -2899,4 +3048,3 @@ const HORSE_CATALOG_DISABLED = {
   }
   /* Kolejne kategorie dodaj tutaj w tym samym formacie */
 };
-
