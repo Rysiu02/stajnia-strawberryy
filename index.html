@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css?v=1979480485"/>
+  <link rel="stylesheet" href="style.css?v=1979481117"/>
 </head>
 <body>
 
@@ -161,13 +161,13 @@
           <div class="stat-card-icon">🏦</div>
           <div class="stat-card-label">Zakładka stajni</div>
           <div class="stat-card-value" id="stat-stable">—</div>
-          <div class="stat-card-change">50% zarobków + wpłaty − wydatki</div>
+          <div class="stat-card-change" id="dash-stable-pct">50% zarobków + wpłaty − wydatki</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-icon">👷</div>
           <div class="stat-card-label">Zakładka pracowników</div>
           <div class="stat-card-value" id="stat-workers-tab">—</div>
-          <div class="stat-card-change pos">50% ze sprzedaży</div>
+          <div class="stat-card-change pos" id="dash-worker-pct">50% ze sprzedaży</div>
         </div>
 
         <div class="stat-card stat-card--treasury">
@@ -199,7 +199,7 @@
         <div class="panel-body" style="padding:0">
           <table class="western-table">
             <thead>
-              <tr><th>Pracownik</th><th>Sprzedaż</th><th>Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th></tr>
+              <tr><th>Pracownik</th><th>Sprzedaż</th><th id="dash-th-zakladka">Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th></tr>
             </thead>
             <tbody id="workers-tabs-body">
               <tr><td colspan="5" class="muted" style="text-align:center;padding:1.5rem">Ładowanie...</td></tr>
@@ -297,11 +297,11 @@
               <strong id="rec-total">0,00 $</strong>
             </div>
             <div class="receipt-summary-row">
-              <span>Zakładka stajni (50%):</span>
+              <span>Zakładka stajni (<span id="rec-split-s">50</span>%):</span>
               <span id="rec-stable-cut" style="color:var(--amber)">0,00 $</span>
             </div>
             <div class="receipt-summary-row">
-              <span>Zakładka pracownika (50%):</span>
+              <span>Zakładka pracownika (<span id="rec-split-w">50</span>%):</span>
               <span id="rec-worker-cut" style="color:#6abf7e">0,00 $</span>
             </div>
           </div>
@@ -427,8 +427,8 @@
           </div>
           <div class="panel-body" style="border-top:1px solid rgba(196,122,43,0.15)">
             <p style="font-family:var(--font-type);font-size:0.8rem;color:var(--dust);line-height:1.6">
-              ⚖ Każdy rachunek dzielony jest <strong style="color:var(--amber)">50% / 50%</strong> — 
-              połowa trafia na zakładkę stajni, połowa na zakładkę pracownika który wystawił rachunek.
+              ⚖ Każdy rachunek dzielony jest <strong style="color:var(--amber)" id="rec-split-desc">50% / 50%</strong> — 
+              <span id="rec-split-desc2">połowa trafia na zakładkę stajni, połowa na zakładkę pracownika który wystawił rachunek.</span>
               Wypłata pracownika = suma jego zakładek za dany okres.
             </p>
           </div>
@@ -960,12 +960,12 @@
         </div>
         <div class="paragon-split">
           <div class="paragon-split-item paragon-split--stable">
-            <div class="paragon-split-label">🏦 Stajnia (50%)</div>
+            <div class="paragon-split-label">🏦 Stajnia (<span id="par-split-s">50</span>%)</div>
             <div class="paragon-split-val" id="par-stable">—</div>
           </div>
           <div class="paragon-split-divider">│</div>
           <div class="paragon-split-item paragon-split--worker">
-            <div class="paragon-split-label">👷 Pracownik (50%)</div>
+            <div class="paragon-split-label">👷 Pracownik (<span id="par-split-w">50</span>%)</div>
             <div class="paragon-split-val" id="par-worker-cut">—</div>
           </div>
         </div>
@@ -1032,12 +1032,12 @@
         </div>
         <div class="paragon-split">
           <div class="paragon-split-item paragon-split--stable">
-            <div class="paragon-split-label">🏦 Stajnia (50%)</div>
+            <div class="paragon-split-label">🏦 Stajnia (<span id="par-edit-split-s">50</span>%)</div>
             <div class="paragon-split-val" id="par-edit-stable">—</div>
           </div>
           <div class="paragon-split-divider">│</div>
           <div class="paragon-split-item paragon-split--worker">
-            <div class="paragon-split-label">👷 Pracownik (50%)</div>
+            <div class="paragon-split-label">👷 Pracownik (<span id="par-edit-split-w">50</span>%)</div>
             <div class="paragon-split-val" id="par-edit-worker-cut">—</div>
           </div>
         </div>
@@ -1106,7 +1106,7 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=1979480485"></script>
+<script type="module" src="app.js?v=1979481117"></script>
 
 <!-- MODAL PROMOCJI -->
 <div id="promo-modal" class="modal-overlay hidden">
