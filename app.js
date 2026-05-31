@@ -369,6 +369,7 @@ function initNumberInputs(root) {
 }
 
 function loadAll() {
+  loadSplitRatio();   // wczytaj podział z Firestore zanim cokolwiek policzy rachunki
   buildMonthsNav();
   loadDashboard();
   loadReceiptsHistory();
@@ -1571,7 +1572,7 @@ async function loadPayroll() {
 
       const tableHtml = (rows) => `
         <table class="western-table">
-          <thead><tr><th>Pracownik</th><th>Zakładka (50%)</th><th>Wypłacono</th><th>Do wypłaty</th><th>Status</th></tr></thead>
+          <thead><tr><th>Pracownik</th><th>Zakładka (${splitRatio.worker}%)</th><th>Wypłacono</th><th>Do wypłaty</th><th>Status</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
 
